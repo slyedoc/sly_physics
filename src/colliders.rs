@@ -1,6 +1,7 @@
 
 use bevy::{prelude::*, math::vec3};
 use bevy_inspector_egui::Inspectable;
+use crate::Aabb;
 
 #[derive(Component, Inspectable, Debug)]
 pub enum Collider {
@@ -19,8 +20,8 @@ impl Collider {
 
     pub fn get_center_of_mass(&self) -> Vec3 {
         match self {
-            Collider::Sphere { radius } => vec3(0.0, 0.0, 0.0),
-            Collider::Cuboid { size } => vec3(0.0, 0.0, 0.0),
+            Collider::Sphere { radius: _ } => vec3(0.0, 0.0, 0.0),
+            Collider::Cuboid { size: _ } => vec3(0.0, 0.0, 0.0),
         }
     }
 
@@ -30,7 +31,20 @@ impl Collider {
                 let i = 2.0 * radius * radius / 5.0;
                 Mat3::from_diagonal(Vec3::splat(i) )
             },
-            Collider::Cuboid { size } => todo!(),
+            Collider::Cuboid { size: _ } => todo!(),
+        }
+
+    }
+
+    pub fn get_aabb(&self) -> Aabb {
+        match self {
+            Collider::Sphere { radius } => {
+                Aabb {
+                    minimums: Vec3::new(-radius, -radius, -radius),
+                    maximums: Vec3::new(*radius, *radius, *radius),
+                }
+            },
+            Collider::Cuboid { size: _ } => todo!(),
         }
 
     }
