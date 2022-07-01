@@ -1,6 +1,6 @@
-use bevy::math::Vec3;
+use bevy::{math::Vec3, prelude::info};
 
-use crate::{LinearVelocity, CenterOfMassWorld};
+use crate::{EPSILON_SQ, EPSILON};
 
 #[allow(dead_code)]
 pub fn ray_sphere_intersect(
@@ -14,7 +14,8 @@ pub fn ray_sphere_intersect(
     let b = m.dot(ray_direction);
     let c = m.dot(m) - sphere_radius * sphere_radius;
 
-    let delta = b * b - a * c;
+    let b2 = b * b;
+    let delta = b2 - (a * c);
 
     if delta < 0.0 {
         None
@@ -53,31 +54,30 @@ pub fn sphere_sphere_static(
 pub fn sphere_sphere_dynamic(
     radius_a: f32,
     radius_b: f32,
-    linear_velocity_a: &LinearVelocity,
-    linear_velocity_b: &LinearVelocity,
-    com_world_a: &CenterOfMassWorld,
-    com_world_b: &CenterOfMassWorld,
+    pos_a: Vec3,
+    pos_b: Vec3,
+    linear_velocity_a: Vec3,
+    linear_velocity_b: Vec3,
     dt: f32,
 ) -> Option<(Vec3, Vec3, f32)> {
-    let relative_velocity = linear_velocity_a.0 - linear_velocity_b.0;
 
-    let start_pt_a = com_world_a.0;
-    let end_pt_a = com_world_a.0 + relative_velocity * dt;
+    let relative_velocity = linear_velocity_a - linear_velocity_b;
+    let start_pt_a = pos_a;
+    let end_pt_a = pos_a + relative_velocity * dt;
     let ray_dir = end_pt_a - start_pt_a;
 
     let mut t0 = 0.0;
     let mut t1 = 0.0;
 
-    const EPSILON: f32 = 0.001;
-    const EPSILON_SQ: f32 = EPSILON * EPSILON;
+
     if ray_dir.length_squared() < EPSILON_SQ {
         // ray is too short, just check if intersecting
-        let ab = com_world_b.0 - com_world_a.0;
+        let ab = pos_b - pos_a;        
         let radius = radius_a + radius_b + EPSILON;
         if ab.length_squared() > radius * radius {
             return None;
         }
-    } else if let Some(toi) = ray_sphere_intersect(com_world_a.0, ray_dir, com_world_b.0, radius_a + radius_b) {
+    } else if let Some(toi) = ray_sphere_intersect(pos_a, ray_dir, pos_b, radius_a + radius_b) {
         t0 = toi.0;
         t1 = toi.1;
     } else {
@@ -102,10 +102,12 @@ pub fn sphere_sphere_dynamic(
     }
 
     // get the points on the respective points of collision
-    let new_pos_a = com_world_b.0 + linear_velocity_a.0 * toi;
-    let new_pos_b = com_world_b.0 + linear_velocity_b.0 * toi;
-    let ab = (new_pos_b - new_pos_a).normalize();
+    let new_pos_a = pos_a + linear_velocity_a * toi;
+    let new_pos_b = pos_b + linear_velocity_b * toi;
+    info!("ab: {:?}", new_pos_b - new_pos_a);
+    let ab = (new_pos_b - new_pos_a).normalize_or_zero();
 
+    info!("ab norm: {:?}", ab);
     let pt_on_a = new_pos_a + ab * radius_a;
     let pt_on_b = new_pos_b - ab * radius_b;
 

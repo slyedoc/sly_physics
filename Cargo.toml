@@ -13,14 +13,16 @@ edition = "2021"
 # # Enable high optimizations for dependencies (incl. Bevy), but not for our code:
 # [profile.dev.package."*"]
 # opt-level = 3
-
+[features]
+default = []
+static = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 bevy =  "0.7" # { git = "https://github.com/bevyengine/bevy", branch = "main" }
 bevy-inspector-egui = { git = "https://github.com/jakobhellermann/bevy-inspector-egui", branch = "main" }
+glam = { version = "0.20.0", features = ["serde", "glam-assert"] }
 
 [dev-dependencies]
 sly_camera_controller = { git = "https://github.com/slyedoc/sly_camera_controller", branch = "main" }
-bevy_rapier3d = { version = "*" }

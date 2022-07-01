@@ -9,6 +9,14 @@ pub enum Collider {
     Cuboid { size: Vec3 },
 }
 
+impl Default for Collider {
+    fn default() -> Self {
+        Self::Sphere {
+            radius: 0.5,
+        }
+    }
+}
+
 impl Collider {
     pub fn sphere(radius: f32) -> Self {
         Collider::Sphere { radius }
@@ -24,7 +32,7 @@ impl Collider {
             Collider::Cuboid { size: _ } => vec3(0.0, 0.0, 0.0),
         }
     }
-
+    
     pub fn get_inertia_tensor(&self) -> Mat3 {
         match self {
             Collider::Sphere { radius } => {
