@@ -2,7 +2,7 @@ use bevy::{math::vec3, prelude::*, window::PresentMode};
 use bevy_inspector_egui::{WorldInspectorPlugin, InspectorPlugin, Inspectable};
 use helper::{AppState, HelperPlugin};
 use sly_camera_controller::*;
-use sly_physics::{Collider,  PhysicsPlugin, RigidbodyBundle, RigidBodyMode};
+use sly_physics::{Collider,  PhysicsPlugin, RigidbodyBundle, RigidBodyMode, PhysicsConfig, PHYSISCS_TIMESTEP};
 mod helper;
 
 fn main() {
@@ -19,17 +19,26 @@ fn main() {
         .add_plugin(InspectorPlugin::<Stack>::new())
         .add_startup_system(helper::setup_camera)
         .add_system_set(SystemSet::on_enter(AppState::Playing).with_system(setup))
+        .add_system(apply_scale)
         .run();
+}
+
+fn apply_scale( 
+    mut config: ResMut<PhysicsConfig>,
+    stack: Res<Stack>,
+) {
+    config.time = stack.time_scale * PHYSISCS_TIMESTEP as f32;
 }
 
 #[derive(Inspectable)]
 pub struct Stack {
     count: u32,
+    time_scale: f32,
 }
 
 impl Default for Stack {
     fn default() -> Self {
-        Self { count: 1 }
+        Self { count: 5, time_scale: 1.0 }
     }
 }
 

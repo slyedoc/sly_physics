@@ -1,12 +1,8 @@
 use bevy::prelude::*;
 
-use crate::{
-    AngularVelocity, CenterOfMass, CenterOfMassWorld, Elasticity, Friction,
-    InertiaTensor, InverseInertiaTensorWorld, InverseMass, LinearVelocity, PhysicsConfig, RBHelper, InverseInertiaTensor, narrow::Contact,
-};
+use crate::*;
 
-#[cfg(not(feature = "static"))]
-use crate::intersect::sphere_sphere_dynamic;
+
 
 pub fn resolve_system(
     mut contacts_events: EventReader<Contact>,
@@ -30,10 +26,11 @@ pub fn resolve_system(
     // Apply Ballistics
     let mut accumulated_time = 0.0;
     for contact in contacts.iter() {
+        //info!("{:?}", contact);
         let contact_time = contact.time_of_impact - accumulated_time;
 
         step_rigibbodies(&mut query, contact_time);
-       resolve_contact(&mut query, contact);
+        resolve_contact(&mut query, contact);
 
         accumulated_time += contact_time;
     }
@@ -139,9 +136,11 @@ fn resolve_contact(
         let angular_j_a = (inv_inertia_world_a * ra.cross(contact.normal)).cross(ra);
         let angular_j_b = (inv_inertia_world_b * rb.cross(contact.normal)).cross(rb);
         let angular_factor = (angular_j_a + angular_j_b).dot(contact.normal);
+        
         // Get the world space velocity of the motion and rotation
         let vel_a = linear_vel_a.0 + ang_vel_a.0.cross(ra);
         let vel_b = linear_vel_b.0 + ang_vel_b.0.cross(rb);
+
         // Calculate the collion impulse
         let vab = vel_a - vel_b;
         let impluse_j =
@@ -165,17 +164,19 @@ fn resolve_contact(
             contact.world_point_b,
             -impluse_vec_j,
         );
+        
         // Calculate the friction impulse
         let friction = friction_a.0 * friction_b.0;
+        
         // Find the normal direction of the velocity with respoect to the normal of the collison
         let velocity_normal = contact.normal * contact.normal.dot(vab);
+
+        // find the tangent direction of the velocity with respect to the normal of the collision
         let velocity_tangent = vab - velocity_normal;
+        
         // Get the tangent velocities relative to the other body
-        info!(
-            "velocity_tangent: {}",
-            velocity_tangent,
-        );
-        let relative_velocity_tangent = velocity_tangent.normalize();
+        let relative_velocity_tangent = velocity_tangent.normalize_or_zero();
+
         let inertia_a = (inv_inertia_world_a * ra.cross(relative_velocity_tangent)).cross(ra);
         let inertia_b = (inv_inertia_world_b * rb.cross(relative_velocity_tangent)).cross(rb);
         let inv_inertia = (inertia_a + inertia_b).dot(relative_velocity_tangent);
@@ -183,6 +184,7 @@ fn resolve_contact(
         // calculat the tangential impluse for friction
         let reduced_mass = 1.0 / (total_inv_mass + inv_inertia);
         let impluse_friction = velocity_tangent * (reduced_mass * friction);
+        
         // TODO: Book didnt have this if check, but I was getitng velocity_tangent of zero leading to
         // a Vec3 Nan when normalized if perfectly lined up on ground
         if !impluse_friction.is_nan() {

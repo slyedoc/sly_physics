@@ -35,29 +35,29 @@ pub fn broadphase_system(
         // Test collisions against all possible overlapping AABBs following current one
         for (b, aabb_b) in list.iter().skip(i + 1) {
             // Stop when tested AABBs are beyond the end of current AABB
-            if aabb_b.minimums.x > aabb_a.maximums.x {
+            if aabb_b.mins.x > aabb_a.maxs.x {
                 break;
             }
 
             // SAT test
-            if aabb_a.minimums.x >= aabb_b.maximums.x {
+            if aabb_a.mins.x >= aabb_b.maxs.x {
                 continue;
             }
-            if aabb_a.maximums.x <= aabb_b.minimums.x {
-                continue;
-            }
-
-            if aabb_a.minimums.y >= aabb_b.maximums.y {
-                continue;
-            }
-            if aabb_a.maximums.y <= aabb_b.minimums.y {
+            if aabb_a.maxs.x <= aabb_b.mins.x {
                 continue;
             }
 
-            if aabb_a.minimums.z >= aabb_b.maximums.z {
+            if aabb_a.mins.y >= aabb_b.maxs.y {
                 continue;
             }
-            if aabb_a.maximums.z <= aabb_b.minimums.z {
+            if aabb_a.maxs.y <= aabb_b.mins.y {
+                continue;
+            }
+
+            if aabb_a.mins.z >= aabb_b.maxs.z {
+                continue;
+            }
+            if aabb_a.maxs.z <= aabb_b.mins.z {
                 continue;
             }
 
@@ -71,8 +71,8 @@ pub fn broadphase_system(
 #[allow(dead_code)]
 fn cmp_x_axis(a: &(Entity, &AabbWorld), b: &(Entity, &AabbWorld)) -> std::cmp::Ordering {
     // Sort on minimum value along either x, y, or z axis
-    let min_a = a.1.minimums.x;
-    let min_b = b.1.minimums.x;
+    let min_a = a.1.mins.x;
+    let min_b = b.1.mins.x;
     if min_a < min_b {
         return std::cmp::Ordering::Less;
     }
@@ -85,8 +85,8 @@ fn cmp_x_axis(a: &(Entity, &AabbWorld), b: &(Entity, &AabbWorld)) -> std::cmp::O
 #[allow(dead_code)]
 fn cmp_y_axis(a: &(Entity, &AabbWorld), b: &(Entity, &AabbWorld)) -> std::cmp::Ordering {
     // Sort on minimum value along either x, y, or z axis
-    let min_a = a.1.minimums.y;
-    let min_b = b.1.minimums.y;
+    let min_a = a.1.mins.y;
+    let min_b = b.1.mins.y;
     if min_a < min_b {
         return std::cmp::Ordering::Less;
     }
@@ -99,8 +99,8 @@ fn cmp_y_axis(a: &(Entity, &AabbWorld), b: &(Entity, &AabbWorld)) -> std::cmp::O
 #[allow(dead_code)]
 fn cmp_z_axis(a: &(Entity, AabbWorld), b: &(Entity, AabbWorld)) -> std::cmp::Ordering {
     // Sort on minimum value along either x, y, or z axis
-    let min_a = a.1.minimums.z;
-    let min_b = b.1.minimums.z;
+    let min_a = a.1.mins.z;
+    let min_b = b.1.mins.z;
     if min_a < min_b {
         return std::cmp::Ordering::Less;
     }

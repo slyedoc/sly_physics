@@ -7,22 +7,25 @@ edition = "2021"
 
 
 # Enable only a small amount of optimization in debug mode
-# [profile.dev]
-# opt-level = 1
+[profile.dev]
+opt-level = 1
 
-# # Enable high optimizations for dependencies (incl. Bevy), but not for our code:
-# [profile.dev.package."*"]
-# opt-level = 3
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
 [features]
 default = []
 static = []
+trace = ["bevy/trace", "bevy/trace_chrome"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 bevy =  "0.7" # { git = "https://github.com/bevyengine/bevy", branch = "main" }
 bevy-inspector-egui = { git = "https://github.com/jakobhellermann/bevy-inspector-egui", branch = "main" }
-glam = { version = "0.20.0", features = ["serde", "glam-assert"] }
+
+#glam = { version = "0.20.0", features = ["serde", "glam-assert"] }
 
 [dev-dependencies]
 sly_camera_controller = { git = "https://github.com/slyedoc/sly_camera_controller", branch = "main" }

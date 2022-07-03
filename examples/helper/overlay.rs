@@ -2,7 +2,7 @@ use bevy::{
     diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
     prelude::*,
 };
-use sly_physics::{PhysicsState};
+use sly_physics::{PhysicsState, DebugState};
 
 use super::Keep;
 
@@ -13,7 +13,8 @@ impl Plugin for OverlayPlugin {
         app.add_plugin(FrameTimeDiagnosticsPlugin::default())
             .add_startup_system(setup_overlay)
             .add_system(update_fps)
-            .add_system(update_state);
+            .add_system(update_state)
+            .add_system(update_debug);
         //.add_system(update_bvh_tri_count)
         //.add_system(update_render_time)
         //.add_system(update_ray_count);
@@ -24,7 +25,10 @@ impl Plugin for OverlayPlugin {
 struct FpsText;
 
 #[derive(Component)]
-struct StateText;
+struct PhysicsStateText;
+
+#[derive(Component)]
+struct DebugStateText;
 
 const UI_SIZE: f32 = 30.0;
 fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
@@ -116,7 +120,51 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
         })
         .insert(Name::new("ui State"))
         .insert(Keep)
-        .insert(StateText);
+        .insert(PhysicsStateText);
+
+        offset += offset_change;
+
+
+        commands
+        .spawn_bundle(TextBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                position: Rect::<Val> {
+                    left: Val::Px(10.0),
+                    bottom: Val::Px(offset),
+                    ..Default::default()
+                },
+                align_self: AlignSelf::FlexEnd,
+                ..Default::default()
+            },
+            // Use `Text` directly
+            text: Text {
+                // Construct a `Vec` of `TextSection`s
+                sections: vec![
+                    TextSection {
+                        value: "Debug: ".to_string(),
+                        style: TextStyle {
+                            font: ui_font.clone(),
+                            font_size: UI_SIZE,
+                            color: Color::WHITE,
+                        },
+                    },
+                    TextSection {
+                        value: "".to_string(),
+                        style: TextStyle {
+                            font: ui_font.clone(),
+                            font_size: UI_SIZE,
+                            color: Color::GOLD,
+                        },
+                    },
+                ],
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(Name::new("ui Debug State"))
+        .insert(Keep)
+        .insert(DebugStateText);
 }
 
 fn update_fps(diagnostics: Res<Diagnostics>, mut query: Query<&mut Text, With<FpsText>>) {
@@ -137,12 +185,26 @@ fn update_fps(diagnostics: Res<Diagnostics>, mut query: Query<&mut Text, With<Fp
 }
 
 
-fn update_state(state: Res<State<PhysicsState>>, mut query: Query<&mut Text, With<StateText>>) {
+fn update_state(state: Res<State<PhysicsState>>, mut query: Query<&mut Text, With<PhysicsStateText>>) {
     for mut text in query.iter_mut() {
         text.sections[1].value = format!("{:?}", state.current());
         text.sections[1].style.color = match state.current() {
             PhysicsState::Running => Color::GREEN,
             PhysicsState::Paused => Color::RED,                        
+        };
+    }
+}
+
+
+fn update_debug(state: Res<State<DebugState>>, mut query: Query<&mut Text, With<DebugStateText>>) {
+    for mut text in query.iter_mut() {
+        text.sections[1].value =  match state.current() {
+            DebugState::Running => "Enabled".to_string(),
+            DebugState::Paused => "Disabled".to_string(),
+        };
+        text.sections[1].style.color = match state.current() {
+            DebugState::Running => Color::GREEN,
+            DebugState::Paused => Color::RED,                        
         };
     }
 }

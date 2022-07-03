@@ -1,7 +1,23 @@
+use std::ops::{Add, AddAssign};
+
 use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
 
 use crate::{MAX_ANGULAR_SPEED_SQ, MAX_ANGULAR_SPEED};
+
+#[derive(Debug)]
+pub struct Contact {
+    pub a: Entity,
+    pub b: Entity,
+    pub world_point_a: Vec3,
+    pub world_point_b: Vec3,
+    pub local_point_a: Vec3,
+    pub local_point_b: Vec3,
+    pub normal: Vec3,
+    pub separation_dist: f32,
+    pub time_of_impact: f32,
+}
+
 
 #[derive(Component, Inspectable, Debug)]
 pub struct RBHelper;
@@ -115,9 +131,9 @@ impl RBHelper {
         // update orientation
         let d_angle = angular_velocity.0 * dt;
         let angle = d_angle.length();
-        let inv_angle = angle.recip();
-        let dq = if inv_angle.is_finite() {
-            Quat::from_axis_angle(d_angle * inv_angle, angle)
+        let rcp_angle = angle.recip();
+        let dq = if rcp_angle.is_finite() {
+            Quat::from_axis_angle(d_angle * rcp_angle, angle)
         } else {
             Quat::IDENTITY
         };
@@ -198,30 +214,87 @@ pub struct InverseInertiaTensorWorld(pub Mat3);
 
 #[derive(Debug, Component, Inspectable)]
 pub struct Aabb {
-    pub minimums: Vec3,
-    pub maximums: Vec3,
+    pub mins: Vec3,
+    pub maxs: Vec3,
 }
 
 impl Default for Aabb {
     fn default() -> Self {
         Self {
-            minimums: Vec3::splat(std::f32::MAX),
-            maximums: Vec3::splat(std::f32::MIN),
+            mins: Vec3::splat(std::f32::MAX),
+            maxs: Vec3::splat(std::f32::MIN),
         }
+    }
+}
+
+impl Add<Vec3> for Aabb {
+    type Output = Self;
+    fn add(self, pt: Vec3) -> Self::Output {
+        Aabb {
+            mins: Vec3::select(pt.cmplt(self.mins), pt, self.mins),
+            maxs: Vec3::select(pt.cmpgt(self.maxs), pt, self.maxs),
+        }
+    }
+}
+
+impl AddAssign<Vec3> for Aabb {
+    fn add_assign(&mut self, pt: Vec3) {
+        self.mins = Vec3::select(pt.cmplt(self.mins), pt, self.mins);
+        self.maxs = Vec3::select(pt.cmpgt(self.maxs), pt, self.maxs);
+    }
+}
+
+impl Aabb {
+    pub fn get_world_aabb(&self, trans: &Transform) -> AabbWorld {
+        // TODO: this is the same as the box version
+        let corners = [
+            Vec3::new(self.mins.x, self.mins.y, self.mins.z),
+            Vec3::new(self.mins.x, self.mins.y, self.maxs.z),
+            Vec3::new(self.mins.x, self.maxs.y, self.mins.z),
+            Vec3::new(self.maxs.x, self.mins.y, self.mins.z),
+            Vec3::new(self.maxs.x, self.maxs.y, self.maxs.z),
+            Vec3::new(self.maxs.x, self.maxs.y, self.mins.z),
+            Vec3::new(self.maxs.x, self.mins.y, self.maxs.z),
+            Vec3::new(self.mins.x, self.maxs.y, self.maxs.z),
+        ];
+
+        let mut bounds = Aabb::default();
+        for pt in &corners {
+            let pt = (trans.rotation * *pt) + trans.translation;
+            bounds.expand_by_point(pt);
+        }
+
+        AabbWorld {
+            maxs: bounds.maxs,
+            mins: bounds.mins,
+        }
+    }
+
+    pub fn expand_by_point(&mut self, rhs: Vec3) {
+        self.mins = Vec3::select(rhs.cmplt(self.mins), rhs, self.mins);
+        self.maxs = Vec3::select(rhs.cmpgt(self.maxs), rhs, self.maxs);
     }
 }
 
 #[derive(Debug, Component, Inspectable)]
 pub struct AabbWorld {
-    pub minimums: Vec3,
-    pub maximums: Vec3,
+    pub mins: Vec3,
+    pub maxs: Vec3,
 }
 
 impl Default for AabbWorld {
     fn default() -> Self {
         Self {
-            minimums: Vec3::splat(std::f32::MAX),
-            maximums: Vec3::splat(std::f32::MIN),
+            mins: Vec3::splat(std::f32::MAX),
+            maxs: Vec3::splat(std::f32::MIN),
         }
+    }
+}
+
+#[derive(Inspectable, Deref, DerefMut, Debug)]
+pub struct Gravity(pub Vec3);
+impl Default for Gravity {
+    fn default() -> Self {
+        Gravity(Vec3::new(0.0, -9.8, 0.0))
     }
 }

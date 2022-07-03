@@ -1,4 +1,4 @@
-use bevy::{math::Vec3, prelude::info};
+use bevy::prelude::*;
 
 use crate::{EPSILON_SQ, EPSILON};
 
@@ -104,10 +104,9 @@ pub fn sphere_sphere_dynamic(
     // get the points on the respective points of collision
     let new_pos_a = pos_a + linear_velocity_a * toi;
     let new_pos_b = pos_b + linear_velocity_b * toi;
-    info!("ab: {:?}", new_pos_b - new_pos_a);
     let ab = (new_pos_b - new_pos_a).normalize_or_zero();
 
-    info!("ab norm: {:?}", ab);
+
     let pt_on_a = new_pos_a + ab * radius_a;
     let pt_on_b = new_pos_b - ab * radius_b;
 

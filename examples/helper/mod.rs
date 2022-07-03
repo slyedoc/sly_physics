@@ -13,7 +13,8 @@ impl Plugin for HelperPlugin {
             .add_plugin(OverlayPlugin)
             .add_system_set(SystemSet::on_update(AppState::Playing).with_system(reset_listen))         
             .add_system_set(SystemSet::on_enter(AppState::Reset).with_system(reset))
-            .add_system(toggle_state);
+            .add_system(toggle_state)
+            .add_system(toggle_debug);
     }
 }
 
@@ -50,9 +51,20 @@ pub fn setup_camera(mut commands: Commands) {
 
 fn toggle_state(mut input: ResMut<Input<KeyCode>>, mut state: ResMut<State<PhysicsState>>) {
     if input.just_pressed(KeyCode::Space) {
-        match state.current() {
-            PhysicsState::Paused => state.pop().unwrap(),
+        match state.current() {            
             PhysicsState::Running => state.push(PhysicsState::Paused).unwrap(),
+            PhysicsState::Paused => state.pop().unwrap(),
+        }
+        input.clear();
+    }
+}
+
+
+fn toggle_debug(mut input: ResMut<Input<KeyCode>>, mut state: ResMut<State<DebugState>>) {
+    if input.just_pressed(KeyCode::Key1) {
+        match state.current() {
+            DebugState::Running => state.push(DebugState::Paused).unwrap(),
+            DebugState::Paused => state.pop().unwrap(),
         }
         input.clear();
     }
