@@ -6,7 +6,7 @@ use bevy_inspector_egui::{Inspectable, InspectorPlugin, WorldInspectorPlugin};
 use helper::{AppState, HelperPlugin};
 use sly_camera_controller::*;
 use sly_physics::{
-    Collider, PhysicsConfig, PhysicsPlugin, RigidBodyMode, RigidbodyBundle, PHYSISCS_TIMESTEP,
+    Collider, PhysicsConfig, PhysicsPlugin, RigidBodyMode, RigidbodyBundle, PHYSISCS_TIMESTEP, LinearVelocity, Mass,
 };
 mod helper;
 
@@ -37,6 +37,14 @@ pub struct Stack {
     count: u32,
     //#[inspector()]
     time_scale: f32,
+    mode: StackMode,
+    ball_velocity: f32,
+}
+
+#[derive(Inspectable)]
+pub enum StackMode {
+    Sphere,
+    Cube,
 }
 
 impl Default for Stack {
@@ -44,6 +52,8 @@ impl Default for Stack {
         Self {
             count: 5,
             time_scale: 1.0,
+            mode: StackMode::Cube,
+            ball_velocity: 60.0,
         }
     }
 }
@@ -53,7 +63,7 @@ pub fn setup_room(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
-    stact: Res<Stack>,
+    stack: Res<Stack>,
 ) {
 
     let floor_size = 100.0;
@@ -82,7 +92,7 @@ pub fn setup_room(
 
 
     // walls
-    for wall in 0..2 {
+    for wall in 0..4 {
         let mut transform = Transform::from_xyz(0.0, wall_height_half, floor_half);       
         transform.rotate_around(
             Vec3::ZERO,
@@ -109,18 +119,23 @@ pub fn setup_room(
             .insert(Name::new("Wall"));
     }
 
+    // Stack
     let radius = 0.5;
-    let size = stact.count;
+    let size = stack.count;
     for i in 0..size {
         for j in 0..size {
             for k in 0..size {
-                let pos = vec3(i as f32, j as f32 + radius, k as f32) * 1.1;
+                let pos = vec3(i as f32 , j as f32 + radius, k as f32 - (radius * 2.0 * size as f32 / 2.0 )) * 1.1;
                 commands
                     .spawn_bundle(PbrBundle {
-                        mesh: meshes.add(Mesh::from(shape::UVSphere {
-                            radius,
-                            ..default()
-                        })),
+                        //mesh: meshes.add(Mesh::from(shape::Box::new(1.0, 1.0, 1.0))),
+                        mesh: match stack.mode {
+                            StackMode::Sphere => meshes.add(Mesh::from(shape::UVSphere {
+                                radius,
+                                ..default()
+                            })),
+                            StackMode::Cube => meshes.add(Mesh::from(shape::Box::new(1.0, 1.0, 1.0))),
+                        },
                         material: materials.add(StandardMaterial {
                             base_color_texture: Some(asset_server.load("checker_red.png")),
                             ..default()
@@ -129,7 +144,10 @@ pub fn setup_room(
                         ..default()
                     })
                     .insert_bundle(RigidbodyBundle {
-                        collider: Collider::Sphere { radius },
+                        collider: match stack.mode {
+                            StackMode::Sphere => Collider::Sphere { radius: radius },
+                            StackMode::Cube => Collider::Cuboid { size: Vec3::ONE },
+                        },
                         mode: RigidBodyMode::Dynamic,
                         ..default()
                     })
@@ -137,4 +155,30 @@ pub fn setup_room(
             }
         }
     }
+
+    // Wreaking Ball
+
+    let wreak_ball_radius = 2.0;
+    
+    commands
+    .spawn_bundle(PbrBundle {
+        transform: Transform::from_xyz(30.0, wreak_ball_radius + 1.0, 0.0),
+        mesh: meshes.add(Mesh::from(shape::UVSphere {
+            radius: wreak_ball_radius,
+            sectors: 64,
+            stacks: 64,
+        })),
+        material: materials.add(StandardMaterial {
+            base_color_texture: Some(asset_server.load("checker_red.png")),
+            ..default()
+        }),
+        ..default()
+    })
+    .insert_bundle(RigidbodyBundle {
+        linear_velocity: LinearVelocity(vec3(-stack.ball_velocity, 0.0, 0.0)),
+        collider: Collider::Sphere { radius: wreak_ball_radius },
+        mass: Mass(20.0),        
+        ..default()
+    })
+    .insert(Name::new("Wreaking Ball"));
 }

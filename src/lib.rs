@@ -1,24 +1,29 @@
 mod broad;
 mod colliders;
+mod constraints;
+mod debug;
 mod intersect;
 mod math;
 mod narrow;
 mod resolve;
 mod types;
-mod debug;
 
 use bevy::{core::FixedTimestep, ecs::schedule::ShouldRun, prelude::*};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use broad::{broadphase_system, BroadContact};
 pub use colliders::*;
-use debug::{PhysicsDebugPlugin};
+use constraints::{solve_contraints, manifold::ManifoldArena, cleanpup_contraints};
+use debug::PhysicsDebugPlugin;
 use narrow::narrow_system;
 use resolve::resolve_system;
 
-pub use debug::DebugState;
 pub use self::types::*;
+pub use debug::DebugState;
 
 pub const PHYSISCS_TIMESTEP: f64 = 1.0 / 60.0;
+
+const MAX_MANIFOLD_CONTACTS: usize = 4;
+const MAX_SOLVE_ITERS: u32 = 5;
 
 // 30 rad/s is fast enough for us
 const MAX_ANGULAR_SPEED: f32 = 30.0;
@@ -38,6 +43,8 @@ pub struct RigidbodyBundle {
     pub friction: Friction,
     pub center_of_mass: CenterOfMass,
     pub inertia_tensor: InertiaTensor,
+    // Added for you
+    // InverseMass, InverseInertiaTensor,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
@@ -59,8 +66,7 @@ impl Default for PhysicsConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(SystemLabel)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemLabel)]
 enum PhysicsSystems {
     Resolved,
 }
@@ -71,11 +77,10 @@ impl Plugin for PhysicsPlugin {
     fn build(&self, app: &mut App) {
         app.add_state(PhysicsState::Running)
             .init_resource::<Gravity>()
-            
             .add_event::<BroadContact>()
             .add_event::<Contact>()
             .init_resource::<PhysicsConfig>()
-            
+            .init_resource::<ManifoldArena>()
             .register_inspectable::<RBHelper>()
             .register_inspectable::<Static>()
             .register_inspectable::<LinearVelocity>()
@@ -85,13 +90,11 @@ impl Plugin for PhysicsPlugin {
             .register_inspectable::<Mass>()
             .register_inspectable::<InverseMass>()
             .register_inspectable::<CenterOfMass>()
-            .register_inspectable::<CenterOfMassWorld>()
             .register_inspectable::<InertiaTensor>()
             .register_inspectable::<InverseInertiaTensor>()
             .register_inspectable::<Collider>()
             .register_inspectable::<Aabb>()
             .register_inspectable::<AabbWorld>()
-            .add_system_set(SystemSet::on_pause(PhysicsState::Running).with_system(print_state))
             .add_system_set_to_stage(
                 CoreStage::PostUpdate,
                 SystemSet::new()
@@ -106,20 +109,17 @@ impl Plugin for PhysicsPlugin {
                             }
                         },
                     ))
-                    .with_system(spawn)
+                    .with_system(cleanpup_contraints)
+                    .with_system(spawn.after(cleanpup_contraints))
                     .with_system(update_world_info.after(spawn))
                     .with_system(gravity_system.after(update_world_info))
                     .with_system(broadphase_system.after(gravity_system))
-                    .with_system(narrow_system.after(broadphase_system))                                        
-                    .with_system(resolve_system.after(narrow_system)),
+                    .with_system(narrow_system.after(broadphase_system))
+                    .with_system(solve_contraints.after(narrow_system))
+                    .with_system(resolve_system.after(solve_contraints)),
             )
             .add_plugin(PhysicsDebugPlugin);
     }
-}
-
-#[allow(dead_code)]
-fn print_state(state: Res<State<PhysicsState>>) {
-    println!("Physics state: {:?}", state.current());
 }
 
 pub fn spawn(
@@ -174,8 +174,8 @@ pub fn spawn(
     }
 }
 
-pub fn update_world_info(mut query: Query<(&mut AabbWorld, &Transform, &Aabb)>
-
+pub fn update_world_info(
+    mut query: Query<(&mut AabbWorld, &Transform, &Aabb)>,
 ) {
     for (mut aabb_world, trans, aabb) in query.iter_mut() {
         //update aabbworld
@@ -183,8 +183,6 @@ pub fn update_world_info(mut query: Query<(&mut AabbWorld, &Transform, &Aabb)>
         let b = aabb.get_world_aabb(trans);
         aabb_world.mins = b.mins;
         aabb_world.maxs = b.maxs;
-
-        
     }
 }
 

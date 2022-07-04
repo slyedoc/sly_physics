@@ -21,6 +21,8 @@ pub fn resolve_system(
 ) {
     let mut contacts = contacts_events.iter().collect::<Vec<_>>();
 
+
+
     contacts.sort_by(|a, b| a.time_of_impact.partial_cmp(&b.time_of_impact).unwrap());
 
     // Apply Ballistics
@@ -147,20 +149,22 @@ fn resolve_contact(
             -(1.0 + elasticity) * vab.dot(contact.normal) / (total_inv_mass + angular_factor);
         let impluse_vec_j = contact.normal * impluse_j;
         RBHelper::apply_impulse(
+            &trans_a,
             &mut linear_vel_a,
             &mut ang_vel_a,
             inv_mass_a,
-            &CenterOfMassWorld(com_world_a),
-            &InverseInertiaTensorWorld(inv_inertia_world_a),
+            com_a,
+            inv_inertia_a,
             contact.world_point_a,
             impluse_vec_j,
         );
         RBHelper::apply_impulse(
+            &trans_b,
             &mut linear_vel_b,
             &mut ang_vel_b,
             inv_mass_b,
-            &CenterOfMassWorld(com_world_b),
-            &InverseInertiaTensorWorld(inv_inertia_world_b),
+            com_a,
+            inv_inertia_b,
             contact.world_point_b,
             -impluse_vec_j,
         );
@@ -190,20 +194,22 @@ fn resolve_contact(
         if !impluse_friction.is_nan() {
             // apply kinetic friction
             RBHelper::apply_impulse(
+                &trans_a,
                 &mut linear_vel_a,
                 &mut ang_vel_a,
                 inv_mass_a,
-                &CenterOfMassWorld(com_world_a),
-                &InverseInertiaTensorWorld(inv_inertia_world_a),
+                com_a,
+                inv_inertia_a,
                 contact.world_point_a,
                 -impluse_friction,
             );
             RBHelper::apply_impulse(
+                &trans_b,
                 &mut linear_vel_b,
                 &mut ang_vel_b,
                 inv_mass_b,
-                &CenterOfMassWorld(com_world_b),
-                &InverseInertiaTensorWorld(inv_inertia_world_b),
+                com_b,
+                inv_inertia_b,
                 contact.world_point_b,
                 impluse_friction,
             );

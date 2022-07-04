@@ -11,11 +11,11 @@ pub struct BroadContact {
     pub b: Entity,
 }
 
+// TODO: Use my bvh for space partitioning next
 
 // The board phase is responsible for pruning the search space of possable collisions
 // I have tried different approaches, and I am sure I will try a few more
 // So far this simple approach has been the fastest
-// TODO: Figure out way to search two axis thats actually faster or bite the bullet and try some space partitioning
 pub fn broadphase_system(
     mut broad_contacts: EventWriter<BroadContact>,
     query: Query<(Entity, &AabbWorld)>,

@@ -1,4 +1,4 @@
-use crate::{Aabb, AabbWorld, PhysicsSystems};
+use crate::{AabbWorld, PhysicsSystems};
 use bevy::{
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
@@ -35,7 +35,7 @@ pub fn spawn_debug(
     query: Query<(Entity, &AabbWorld, &Transform), Without<PhysicsDebug>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    for (e, aabb, trans) in query.iter() {
+    for (e, aabb, _trans) in query.iter() {
         // Spawn bounding box, creating new entity seen we dont want rotation
         let id = commands
             .spawn_bundle(PbrBundle {

@@ -1,11 +1,11 @@
-use std::ops::{Add, AddAssign};
+use std::{ops::{Add, AddAssign}, cmp::Ordering};
 
 use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
 
 use crate::{MAX_ANGULAR_SPEED_SQ, MAX_ANGULAR_SPEED};
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Contact {
     pub a: Entity,
     pub b: Entity,
@@ -18,7 +18,19 @@ pub struct Contact {
     pub time_of_impact: f32,
 }
 
+impl Contact {
+    pub fn correct(&mut self) {
 
+        // edit contacts so A < B, makes manifold lookups easier
+    
+        if self.a.partial_cmp(&self.b) == Some(Ordering::Greater) {
+            std::mem::swap(&mut self.local_point_a, &mut self.local_point_b);
+            std::mem::swap(&mut self.world_point_a, &mut self.world_point_b);
+            std::mem::swap(&mut self.a, &mut self.b);
+        }
+        
+    }
+}
 #[derive(Component, Inspectable, Debug)]
 pub struct RBHelper;
 
@@ -43,16 +55,22 @@ impl RBHelper {
         com_world + trans.rotation * local_point
     }
 
-    pub fn centre_of_mass_world(t: &Transform, com: Vec3) -> Vec3 {
-        t.translation + t.rotation * com
+    pub fn inv_intertia_tensor_world(trans: &Transform, inv_inertia_tensor: &InverseInertiaTensor) -> Mat3 {
+        let orientation = Mat3::from_quat(trans.rotation);
+        orientation * inv_inertia_tensor.0 * orientation.transpose()
+    }
+
+    pub fn centre_of_mass_world(t: &Transform, com: &CenterOfMass) -> Vec3 {
+        t.translation + t.rotation * com.0
     }
 
     pub fn apply_impulse(
+        trans: &Transform,
         linear_velocity: &mut LinearVelocity,
         angular_velocity: &mut AngularVelocity,
         inv_mass: &InverseMass,
-        com_world: &CenterOfMassWorld,
-        inv_inertia_tensor_world: &InverseInertiaTensorWorld,
+        com: &CenterOfMass,
+        inv_inertia_tensor: &InverseInertiaTensor,
         impulse_point: Vec3,
         impulse: Vec3,
     ) {
@@ -63,9 +81,9 @@ impl RBHelper {
         // impulse is in world space direction and magnitude of the impulse
         RBHelper::apply_impulse_linear(linear_velocity, inv_mass, impulse);
 
-        let r = impulse_point - com_world.0;
+        let r = impulse_point - RBHelper::centre_of_mass_world(trans, com);
         let dl = r.cross(impulse); // this is in world space
-        RBHelper::apply_impulse_angular(angular_velocity, inv_mass, inv_inertia_tensor_world, dl);
+        RBHelper::apply_impulse_angular(trans, angular_velocity, inv_mass, inv_inertia_tensor, dl);
     }
 
     pub fn apply_impulse_linear(
@@ -82,9 +100,10 @@ impl RBHelper {
         linear_velocity.0 += impulse * inv_mass.0;
     }
     pub fn apply_impulse_angular(
+        trans: &Transform,
         angular_velocity: &mut AngularVelocity,
         inv_mass: &InverseMass,
-        inv_inertia_tensor_world: &InverseInertiaTensorWorld,
+        inv_inertia_tensor: &InverseInertiaTensor,
         impulse: Vec3,
     ) {
         if inv_mass.0 == 0.0 {
@@ -94,7 +113,7 @@ impl RBHelper {
         // L = I w = r x p
         // dL = I dw = r x J
         // => dw = I^-1 * (r x J)
-        angular_velocity.0 += inv_inertia_tensor_world.0 * impulse;
+        angular_velocity.0 += RBHelper::inv_intertia_tensor_world(trans, inv_inertia_tensor ) * impulse;
 
         // clamp angular_velocity 
         if angular_velocity.0.length_squared() > MAX_ANGULAR_SPEED_SQ {
@@ -169,7 +188,7 @@ pub struct Elasticity(pub f32); // assumed [0,1]
 
 impl Default for Elasticity {
     fn default() -> Elasticity {
-        Elasticity(1.0)
+        Elasticity(0.9)
     }
 }
 
@@ -197,19 +216,19 @@ pub struct InverseMass(pub f32);
 #[derive(Component, Inspectable, Debug, Default)]
 pub struct CenterOfMass(pub Vec3);
 
-#[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
-pub struct CenterOfMassWorld(pub Vec3);
+
 
 #[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
 pub struct InertiaTensor(pub Mat3);
 
-#[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
-pub struct InertiaTensorWorld(pub Mat3);
 
 #[derive(Component, Inspectable, Debug, Default)]
 pub struct InverseInertiaTensor(pub Mat3);
 
-#[derive(Component, Inspectable, Debug, Default)]
+#[derive(Debug, Default)]
+pub struct CenterOfMassWorld(pub Vec3);
+
+#[derive(Debug, Default)]
 pub struct InverseInertiaTensorWorld(pub Mat3);
 
 #[derive(Debug, Component, Inspectable)]
@@ -246,7 +265,6 @@ impl AddAssign<Vec3> for Aabb {
 
 impl Aabb {
     pub fn get_world_aabb(&self, trans: &Transform) -> AabbWorld {
-        // TODO: this is the same as the box version
         let corners = [
             Vec3::new(self.mins.x, self.mins.y, self.mins.z),
             Vec3::new(self.mins.x, self.mins.y, self.maxs.z),
