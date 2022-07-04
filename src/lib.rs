@@ -109,8 +109,8 @@ impl Plugin for PhysicsPlugin {
                             }
                         },
                     ))
-                    .with_system(cleanpup_contraints)
-                    .with_system(spawn.after(cleanpup_contraints))
+                    .with_system(cleanpup_contraints.before(solve_contraints))
+                    .with_system(spawn)
                     .with_system(update_world_info.after(spawn))
                     .with_system(gravity_system.after(update_world_info))
                     .with_system(broadphase_system.after(gravity_system))

@@ -11,7 +11,7 @@ pub mod manifold;
 use crate::{
     math::{MatMN, VecN},
     AngularVelocity, CenterOfMass, Elasticity, Friction, InertiaTensor, InverseInertiaTensor,
-    InverseMass, LinearVelocity, PhysicsConfig, RBHelper, MAX_MANIFOLD_CONTACTS, MAX_SOLVE_ITERS,
+    InverseMass, LinearVelocity, PhysicsConfig, RBHelper, MAX_SOLVE_ITERS,
 };
 use bevy::prelude::*;
 
@@ -113,7 +113,7 @@ pub fn cleanpup_contraints(
             
         }
     }
-    
+
     for k in remove_list {
         manifold_arena.manifolds.remove(&k);
     }
