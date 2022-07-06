@@ -1,24 +1,32 @@
-// use super::{Constraint, ConstraintConfig};
-// use crate::body::BodyArena;
+use bevy::prelude::{Entity, Query, Transform};
 
-// pub struct ConstraintMoverSimple {
-//     config: ConstraintConfig,
-//     time: f32,
-// }
+use crate::{
+    AngularVelocity, CenterOfMass, Elasticity, Friction, InertiaTensor, InverseInertiaTensor,
+    InverseMass, LinearVelocity,
+};
 
-// impl ConstraintMoverSimple {
-//     pub fn new(config: ConstraintConfig) -> Self {
-//         ConstraintMoverSimple { config, time: 0.0 }
-//     }
-// }
+pub struct ConstraintMoverSimple {
+    time: f32,
+}
 
-// impl Constraint for ConstraintMoverSimple {
-//     fn pre_solve(&mut self, bodies: &mut BodyArena, dt_sec: f32) {
-//         self.time += dt_sec;
+impl ConstraintMoverSimple {
+    pub fn new() -> Self {
+        ConstraintMoverSimple { time: 0.0 }
+    }
+}
 
-//         let body_a = bodies.get_body_mut(self.config.handle_a);
-//         body_a.linear_velocity.z = f32::cos(self.time * 0.25) * 4.0;
-//     }
+impl ConstraintMoverSimple {
+    fn pre_solve(
+        &mut self,
+        rb_query: &mut Query<&mut LinearVelocity>,
+        a: Entity,
+        b: Entity,
+        dt_sec: f32,
+    ) {
+        self.time += dt_sec;
 
-//     fn solve(&mut self, _bodies: &mut BodyArena) {}
-// }
+        let mut lin_vel = rb_query.get_mut(a).expect("Mover Entity not found");
+
+        lin_vel.0.z = f32::cos(self.time * 0.25) * 4.0;
+    }
+}

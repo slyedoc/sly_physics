@@ -4,11 +4,14 @@ use crate::{
 };
 use bevy::prelude::*;
 
-use super::{Constraint, ConstraintConfig};
+use super::Constraint;
+
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct ConstraintPenetration {
-    config: ConstraintConfig,
+    pub anchor_a: Vec3, // the anchor location in body_a's space
+    pub anchor_b: Vec3, // the anchor location in body_b's space
+
     jacobian: MatMN<3, 12>,
     cached_lambda: VecN<3>,
     normal: Vec3, // in body A's local space
@@ -17,9 +20,10 @@ pub struct ConstraintPenetration {
 }
 
 impl ConstraintPenetration {
-    pub fn new(config: ConstraintConfig, normal: Vec3) -> Self {
+    pub fn new(local_point_a: Vec3, local_point_b: Vec3, normal: Vec3) -> Self {
         Self {
-            config,
+            anchor_a: local_point_a,
+            anchor_b: local_point_b,
             jacobian: MatMN::zero(),
             cached_lambda: VecN::zero(),
             normal,
@@ -37,8 +41,8 @@ impl ConstraintPenetration {
     }
 }
 
-impl Constraint for ConstraintPenetration {
-    fn pre_solve(
+impl ConstraintPenetration {
+    pub fn pre_solve(
         &mut self,
         rb_query: &mut Query<(
             &mut Transform,
@@ -78,9 +82,9 @@ impl Constraint for ConstraintPenetration {
         )] = rb_query.many_mut([a, b]);
 
         // get the world space position of the hinge from body_a's orientation
-        let world_anchor_a = RBHelper::local_to_world(&trans_a, com_a, self.config.anchor_a);
+        let world_anchor_a = RBHelper::local_to_world(&trans_a, com_a, self.anchor_a);
         // get the world space position of the hinge from body_b's orientation
-        let world_anchor_b = RBHelper::local_to_world(&trans_b, com_b, self.config.anchor_b);
+        let world_anchor_b = RBHelper::local_to_world(&trans_b, com_b, self.anchor_b);
 
         let com_world_a = trans_a.translation + trans_a.rotation * com_a.0;
         let com_world_b = trans_b.translation + trans_b.rotation * com_b.0;
@@ -183,7 +187,7 @@ impl Constraint for ConstraintPenetration {
 
         // apply warm starting from last frame
         let impulses = self.jacobian.transpose() * self.cached_lambda;
-        self.config.apply_impulses(
+        Constraint::apply_impulses(
             &trans_a,
             &mut lin_vel_a,
             &mut ang_vel_a,
@@ -203,7 +207,7 @@ impl Constraint for ConstraintPenetration {
         self.baumgarte = beta * c / dt_sec;
     }
 
-    fn solve(
+    pub fn solve(
         &mut self,
         rb_query: &mut Query<(
             &mut Transform,
@@ -244,10 +248,8 @@ impl Constraint for ConstraintPenetration {
         )] = rb_query.many_mut([a, b]);
 
         // build the system of equations
-        let q_dt = self
-            .config
-            .get_velocities(&lin_vel_a, &ang_vel_a, &lin_vel_b, &ang_vel_b);
-        let inv_mass_matrix = self.config.get_inverse_mass_matrix(
+        let q_dt = Constraint::get_velocities(&lin_vel_a, &ang_vel_a, &lin_vel_b, &ang_vel_b);
+        let inv_mass_matrix = Constraint::get_inverse_mass_matrix(
             &trans_a,
             inv_mass_a,
             inv_inertia_tensor_a,
@@ -297,7 +299,7 @@ impl Constraint for ConstraintPenetration {
 
         // apply the impulses
         let impulses = jacobian_transpose * lambda_n;
-        self.config.apply_impulses(
+        Constraint::apply_impulses(
             &trans_a,
             &mut lin_vel_a,
             &mut ang_vel_a,
@@ -310,23 +312,5 @@ impl Constraint for ConstraintPenetration {
             inv_inertia_tensor_b,
             impulses,
         );
-    }
-
-    fn post_solve(
-        &mut self,
-        _rb_query: &mut Query<(
-            &mut Transform,
-            &mut LinearVelocity,
-            &mut AngularVelocity,
-            &InverseMass,
-            &Elasticity,
-            &Friction,
-            &CenterOfMass,
-            &InertiaTensor,
-            &InverseInertiaTensor,
-        )>,
-        _a: Entity,
-        _b: Entity,
-    ) {
     }
 }

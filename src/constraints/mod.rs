@@ -15,7 +15,6 @@ use crate::{
 };
 use bevy::prelude::*;
 
-
 // use constraint_constant_velocity::ConstraintConstantVelocityLimited;
 // use constraint_distance::ConstraintDistance;
 // use constraint_hinge_quat::ConstraintHingeQuatLimited;
@@ -57,43 +56,34 @@ pub fn solve_contraints(
         }
     }
 
-    // self.constraints.post_solve();
-    for (&(a, b), manifold) in &mut manifold_arena.manifolds {
-        for contrain in manifold.constraints.iter_mut() {
-            contrain.post_solve(&mut rb_query, a, b);
-        }
-    }
 }
 
 pub fn cleanpup_contraints(
     mut manifold_arena: ResMut<ManifoldArena>,
-    rb_query: Query<(
-        &Transform,
-        &CenterOfMass,
-    )>,
+    rb_query: Query<(&Transform, &CenterOfMass)>,
 ) {
     let mut remove_list = Vec::new();
     for (&(a, b), manifold) in &mut manifold_arena.manifolds {
         // remove any contacts that have drifted too far
         let mut i = 0;
-        
+
         if let Ok([(trans_a, com_a), (trans_b, com_b)]) = rb_query.get_many([a, b]) {
             while i < manifold.contacts.len() {
                 let contact = manifold.contacts[i];
-    
+
                 // get the tangential distance of the point on a and the point on b
                 let a = RBHelper::local_to_world(trans_a, com_a, contact.local_point_a);
                 let b = RBHelper::local_to_world(trans_b, com_b, contact.local_point_b);
-    
+
                 let mut normal = manifold.constraints[i].normal();
                 normal = trans_a.rotation * normal;
-    
+
                 // calculate the tangential separation and penetration depth
                 let ab = b - a;
                 let penetration_depth = normal.dot(ab);
                 let ab_normal = normal * penetration_depth;
                 let ab_tangent = ab - ab_normal;
-    
+
                 // if the tangential displacement is less than a specific threshold, it's okay to keep
                 // it.
                 const DISTANCE_THRESHOLD: f32 = 0.02;
@@ -103,102 +93,43 @@ pub fn cleanpup_contraints(
                     i += 1;
                     continue;
                 }
-    
+
                 // this contact has moved beyond its threshold and should be removed
                 manifold.constraints.remove(i);
                 manifold.contacts.remove(i);
-            }    
+            }
         } else {
             remove_list.push((a, b));
-            
         }
     }
 
     for k in remove_list {
         manifold_arena.manifolds.remove(&k);
     }
-    
+
     // if there are no contacts left, remove the manifold
     manifold_arena
         .manifolds
         .retain(|&(_a, _b), manifold| manifold.contacts.len() > 0)
 }
 
-pub trait Constraint: Send + Sync {
-    fn pre_solve(
-        &mut self,
-        rb_query: &mut Query<(
-            &mut Transform,
-            &mut LinearVelocity,
-            &mut AngularVelocity,
-            &InverseMass,
-            &Elasticity,
-            &Friction,
-            &CenterOfMass,
-            &InertiaTensor,
-            &InverseInertiaTensor,
-        )>,
-        a: Entity,
-        b: Entity,
-        dt_sec: f32,
-    );
-    fn solve(
-        &mut self,
-        rb_query: &mut Query<(
-            &mut Transform,
-            &mut LinearVelocity,
-            &mut AngularVelocity,
-            &InverseMass,
-            &Elasticity,
-            &Friction,
-            &CenterOfMass,
-            &InertiaTensor,
-            &InverseInertiaTensor,
-        )>,
-        a: Entity,
-        b: Entity,
-    );
-    fn post_solve(
-        &mut self,
-        rb_query: &mut Query<(
-            &mut Transform,
-            &mut LinearVelocity,
-            &mut AngularVelocity,
-            &InverseMass,
-            &Elasticity,
-            &Friction,
-            &CenterOfMass,
-            &InertiaTensor,
-            &InverseInertiaTensor,
-        )>,
-        a: Entity,
-        b: Entity,
-    );
-}
 
-#[derive(Copy, Clone, Debug, Default)]
-pub struct ConstraintConfig {
+pub struct Constraint;
 
-    pub anchor_a: Vec3, // the anchor location in body_a's space
-    pub axis_a: Vec3,   // the axis direction in body_a's space
-
-    pub anchor_b: Vec3, // the anchor location in body_b's space
-    pub axis_b: Vec3,   // the axis direction in body_b's space
-}
-
-impl ConstraintConfig {
-    fn get_inverse_mass_matrix(&self, 
-        
+impl Constraint {
+    fn get_inverse_mass_matrix(
         // A
-        trans_a: &Transform, inv_mass_a: &InverseMass, inv_inertia_tensor_a: &InverseInertiaTensor,
+        trans_a: &Transform,
+        inv_mass_a: &InverseMass,
+        inv_inertia_tensor_a: &InverseInertiaTensor,
         // B
-        trans_b: &Transform, inv_mass_b: &InverseMass, inv_inertia_tensor_b: &InverseInertiaTensor,
-
-     ) -> MatMN<12, 12> {
+        trans_b: &Transform,
+        inv_mass_b: &InverseMass,
+        inv_inertia_tensor_b: &InverseInertiaTensor,
+    ) -> MatMN<12, 12> {
         let mut inv_mass_matrix = MatMN::zero();
 
         {
-
             inv_mass_matrix.rows[0][0] = inv_mass_a.0;
             inv_mass_matrix.rows[1][1] = inv_mass_a.0;
             inv_mass_matrix.rows[2][2] = inv_mass_a.0;
@@ -229,7 +160,6 @@ impl ConstraintConfig {
     }
 
     fn get_velocities(
-        &self,
         lin_vel_a: &LinearVelocity,
         ang_vel_a: &AngularVelocity,
         lin_vel_b: &LinearVelocity,
@@ -256,26 +186,47 @@ impl ConstraintConfig {
         q_dt
     }
 
-    fn apply_impulses(&self, 
+    fn apply_impulses(
+
         // A
-            trans_a: &Transform, lin_vel_a: &mut LinearVelocity, ang_vel_a: &mut AngularVelocity, inv_mass_a: &InverseMass, inv_inertia_tensor_a: &InverseInertiaTensor,
+        trans_a: &Transform,
+        lin_vel_a: &mut LinearVelocity,
+        ang_vel_a: &mut AngularVelocity,
+        inv_mass_a: &InverseMass,
+        inv_inertia_tensor_a: &InverseInertiaTensor,
         // B
-            trans_b: &Transform, lin_vel_b: &mut LinearVelocity, ang_vel_b: &mut AngularVelocity, inv_mass_b: &InverseMass, inv_inertia_tensor_b: &InverseInertiaTensor,
-        impulses: VecN<12>
+        trans_b: &Transform,
+        lin_vel_b: &mut LinearVelocity,
+        ang_vel_b: &mut AngularVelocity,
+        inv_mass_b: &InverseMass,
+        inv_inertia_tensor_b: &InverseInertiaTensor,
+        impulses: VecN<12>,
     ) {
         {
             let force_internal_a = Vec3::from_slice(&impulses[0..]);
             let torque_internal_a = Vec3::from_slice(&impulses[3..]);
-    
+
             RBHelper::apply_impulse_linear(lin_vel_a, inv_mass_a, force_internal_a);
-            RBHelper::apply_impulse_angular(trans_a,  ang_vel_a, inv_mass_a, inv_inertia_tensor_a, torque_internal_a)
+            RBHelper::apply_impulse_angular(
+                trans_a,
+                ang_vel_a,
+                inv_mass_a,
+                inv_inertia_tensor_a,
+                torque_internal_a,
+            )
         }
 
         {
             let force_internal_b = Vec3::from_slice(&impulses[6..]);
             let torque_internal_b = Vec3::from_slice(&impulses[9..]);
             RBHelper::apply_impulse_linear(lin_vel_b, inv_mass_b, force_internal_b);
-            RBHelper::apply_impulse_angular(trans_b,  ang_vel_b, inv_mass_b, inv_inertia_tensor_b, torque_internal_b)
+            RBHelper::apply_impulse_angular(
+                trans_b,
+                ang_vel_b,
+                inv_mass_b,
+                inv_inertia_tensor_b,
+                torque_internal_b,
+            )
         }
     }
 }

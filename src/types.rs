@@ -282,10 +282,7 @@ impl Aabb {
             bounds.expand_by_point(pt);
         }
 
-        AabbWorld {
-            maxs: bounds.maxs,
-            mins: bounds.mins,
-        }
+        AabbWorld(bounds)
     }
 
     pub fn expand_by_point(&mut self, rhs: Vec3) {
@@ -294,25 +291,7 @@ impl Aabb {
     }
 }
 
-#[derive(Debug, Component, Inspectable)]
-pub struct AabbWorld {
-    pub mins: Vec3,
-    pub maxs: Vec3,
-}
+#[derive(Debug, Deref, DerefMut, Default, Component, Inspectable)]
+pub struct AabbWorld(pub Aabb);
 
-impl Default for AabbWorld {
-    fn default() -> Self {
-        Self {
-            mins: Vec3::splat(std::f32::MAX),
-            maxs: Vec3::splat(std::f32::MIN),
-        }
-    }
-}
 
-#[derive(Inspectable, Deref, DerefMut, Debug)]
-pub struct Gravity(pub Vec3);
-impl Default for Gravity {
-    fn default() -> Self {
-        Gravity(Vec3::new(0.0, -9.8, 0.0))
-    }
-}

@@ -3,7 +3,7 @@ use bevy::{prelude::*, utils::HashMap};
 
 use crate::{Contact, CenterOfMass, MAX_MANIFOLD_CONTACTS, RBHelper};
 
-use super::{ConstraintPenetration, ConstraintConfig};
+use super::{ConstraintPenetration};
 
 #[derive(Debug, Default)]
 pub struct ManifoldArena {
@@ -117,19 +117,8 @@ impl Manifold {
             self.contacts.len() - 1
         };
 
-
-
-        // TODO: might be cheaper to reused existing constraint rather than memcpying a new one
-        let mut normal = trans_a.rotation.inverse() * -contact.normal;
-        normal = normal.normalize();
-        let constraint = ConstraintPenetration::new(
-            ConstraintConfig {
-                anchor_a: contact.local_point_a,
-                anchor_b: contact.local_point_b,
-                ..ConstraintConfig::default()
-            },
-            normal,
-        );
+        let normal = (trans_a.rotation.inverse() * -contact.normal).normalize();
+        let constraint = ConstraintPenetration::new(contact.local_point_a, contact.local_point_b, normal);
         if index < self.constraints.len() {
             self.constraints[index] = constraint;
         } else {
@@ -137,8 +126,5 @@ impl Manifold {
         }        
     }
 
-    fn contact(&self, index: usize) -> &Contact {
-        assert!(index < MAX_MANIFOLD_CONTACTS as usize);
-        &self.contacts[index]
-    }
+
 }

@@ -2,6 +2,7 @@ mod broad;
 mod colliders;
 mod constraints;
 mod debug;
+mod gravity;
 mod intersect;
 mod math;
 mod narrow;
@@ -12,8 +13,9 @@ use bevy::{core::FixedTimestep, ecs::schedule::ShouldRun, prelude::*};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use broad::{broadphase_system, BroadContact};
 pub use colliders::*;
-use constraints::{solve_contraints, manifold::ManifoldArena, cleanpup_contraints};
+use constraints::{cleanpup_contraints, manifold::ManifoldArena, solve_contraints};
 use debug::PhysicsDebugPlugin;
+use gravity::GravityPlugin;
 use narrow::narrow_system;
 use resolve::resolve_system;
 
@@ -75,8 +77,8 @@ pub struct PhysicsPlugin;
 
 impl Plugin for PhysicsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_state(PhysicsState::Running)
-            .init_resource::<Gravity>()
+        app.add_plugin(GravityPlugin)
+            .add_state(PhysicsState::Running)
             .add_event::<BroadContact>()
             .add_event::<Contact>()
             .init_resource::<PhysicsConfig>()
@@ -112,8 +114,7 @@ impl Plugin for PhysicsPlugin {
                     .with_system(cleanpup_contraints.before(solve_contraints))
                     .with_system(spawn)
                     .with_system(update_world_info.after(spawn))
-                    .with_system(gravity_system.after(update_world_info))
-                    .with_system(broadphase_system.after(gravity_system))
+                    .with_system(broadphase_system.after(update_world_info))
                     .with_system(narrow_system.after(broadphase_system))
                     .with_system(solve_contraints.after(narrow_system))
                     .with_system(resolve_system.after(solve_contraints)),
@@ -174,29 +175,12 @@ pub fn spawn(
     }
 }
 
-pub fn update_world_info(
-    mut query: Query<(&mut AabbWorld, &Transform, &Aabb)>,
-) {
-    for (mut aabb_world, trans, aabb) in query.iter_mut() {
+pub fn update_world_info(mut query: Query<(&Transform, &Aabb, &mut AabbWorld)>) {
+    for (trans, aabb, mut aabb_world) in query.iter_mut() {
         //update aabbworld
 
         let b = aabb.get_world_aabb(trans);
-        aabb_world.mins = b.mins;
-        aabb_world.maxs = b.maxs;
-    }
-}
-
-pub fn gravity_system(
-    mut query: Query<(&mut LinearVelocity, &Mass, &InverseMass), Without<Static>>,
-    gravity: Res<Gravity>,
-    config: Res<PhysicsConfig>,
-) {
-    for (mut linear_velocity, mass, inv_mass) in query.iter_mut() {
-        // since rb is not static, inv mass shouldnt be 0 or less
-        debug_assert!(inv_mass.0 > 0.0);
-
-        // Apply Gravity, it needs to be an impluse
-        let gravey_impluse = gravity.0 * mass.0 * config.time;
-        linear_velocity.0 += gravey_impluse * inv_mass.0;
+        aabb_world.0.mins = b.mins;
+        aabb_world.0.maxs = b.maxs;
     }
 }
