@@ -6,7 +6,7 @@ use bevy_inspector_egui::{Inspectable, InspectorPlugin, WorldInspectorPlugin};
 use helper::{AppState, HelperPlugin};
 use sly_camera_controller::*;
 use sly_physics::{
-    Collider, PhysicsConfig, PhysicsPlugin, RigidBodyMode, RigidbodyBundle, PHYSISCS_TIMESTEP, LinearVelocity, Mass,
+    Collider, PhysicsConfig, PhysicsPlugin, RigidBody, RigidBodyBundle, PHYSISCS_TIMESTEP, LinearVelocity, Mass,
 };
 mod helper;
 
@@ -81,11 +81,11 @@ pub fn setup_room(
             }),
             ..default()
         })
-        .insert_bundle(RigidbodyBundle {
+        .insert_bundle(RigidBodyBundle {
             collider: Collider::Cuboid {
                 size: vec3(floor_size, 1.0, floor_size),
             },
-            mode: RigidBodyMode::Static,
+            mode: RigidBody::Static,
             ..default()
         })
         .insert(Name::new("Floor"));
@@ -109,11 +109,11 @@ pub fn setup_room(
                 }),
                 ..default()
             })
-            .insert_bundle(RigidbodyBundle {
+            .insert_bundle(RigidBodyBundle {
                 collider: Collider::Cuboid {
                     size: vec3(floor_size, wall_height, 1.0),
                 },
-                mode: RigidBodyMode::Static,
+                mode: RigidBody::Static,
                 ..default()
             })
             .insert(Name::new("Wall"));
@@ -143,12 +143,11 @@ pub fn setup_room(
                         transform: Transform::from_translation(pos),
                         ..default()
                     })
-                    .insert_bundle(RigidbodyBundle {
+                    .insert_bundle(RigidBodyBundle {
                         collider: match stack.mode {
                             StackMode::Sphere => Collider::Sphere { radius: radius },
                             StackMode::Cube => Collider::Cuboid { size: Vec3::ONE },
                         },
-                        mode: RigidBodyMode::Dynamic,
                         ..default()
                     })
                     .insert(Name::new(format!("Sphere ({}, {}, {})", i, j, k)));
@@ -174,7 +173,7 @@ pub fn setup_room(
         }),
         ..default()
     })
-    .insert_bundle(RigidbodyBundle {
+    .insert_bundle(RigidBodyBundle {
         linear_velocity: LinearVelocity(vec3(-stack.ball_velocity, 0.0, 0.0)),
         collider: Collider::Sphere { radius: wreak_ball_radius },
         mass: Mass(20.0),        

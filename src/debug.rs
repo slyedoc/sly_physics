@@ -71,25 +71,25 @@ pub struct PhysicsDebug;
 
 pub fn spawn_debug(
     mut commands: Commands,
-    query: Query<(Entity, &Aabb, &AabbWorld, &Transform), Without<AabbDebug>>,
+    query: Query<(Entity, &Aabb, &AabbWorld, &Transform), Without<AabbWorldDebug>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for (e, aabb, aabb_world, _trans) in query.iter() {
         // Spawn aabb, creating new entity seen we dont want rotation
-        {
-            let id = commands
-                .spawn_bundle(PbrBundle {
-                    //transform: Transform::from_translation(trans.translation),
-                    mesh: meshes.add(Mesh::from(aabb)),
-                    visibility: Visibility { is_visible: true },
-                    ..Default::default()
-                })
-                .insert(PhysicsDebug)
-                .insert(Name::new("Aabb Debug"))
-                .id();
+        // {
+        //     let id = commands
+        //         .spawn_bundle(PbrBundle {
+        //             //transform: Transform::from_translation(trans.translation),
+        //             mesh: meshes.add(Mesh::from(aabb)),
+        //             visibility: Visibility { is_visible: true },
+        //             ..Default::default()
+        //         })
+        //         .insert(PhysicsDebug)
+        //         .insert(Name::new("Aabb Debug"))
+        //         .id();
 
-            commands.entity(e).insert(AabbDebug(id));
-        }
+        //     commands.entity(e).insert(AabbDebug(id));
+        // }
 
         {
             let id = commands
@@ -110,14 +110,11 @@ pub fn spawn_debug(
 }
 
 pub fn update_debug(
-    query: Query<(&AabbDebug, &Aabb, &AabbWorldDebug, &AabbWorld)>,
+    query: Query<(&AabbWorldDebug, &AabbWorld)>,
     mut mesh_query: Query<&mut Handle<Mesh>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    for (target_aabb, aabb, target_aabb_world, aabb_world) in query.iter() {
-        let mut aabb_handle = mesh_query.get_mut(target_aabb.0).unwrap();
-        *aabb_handle = meshes.add(Mesh::from(aabb));
-
+    for ( target_aabb_world, aabb_world) in query.iter() {
         let mut aabb_world_handle = mesh_query.get_mut(target_aabb_world.0).unwrap();
         *aabb_world_handle = meshes.add(Mesh::from(&aabb_world.0));
         //trans_target.translation = trans_parent.translation;
@@ -131,7 +128,7 @@ pub fn remove_debug(
 ) {
     // Remove debug components
     for e in query.iter() {
-        commands.entity(e).remove::<AabbDebug>();
+        //commands.entity(e).remove::<AabbDebug>();
         commands.entity(e).remove::<AabbWorldDebug>();
     }
 

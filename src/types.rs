@@ -163,14 +163,14 @@ impl RBHelper {
 }
 
 #[derive(Component, Inspectable, Debug, PartialEq, Eq)]
-pub enum RigidBodyMode {
+pub enum RigidBody {
     Static,
     Dynamic,
 }
 
-impl Default for RigidBodyMode {
+impl Default for RigidBody {
     fn default() -> Self {
-        RigidBodyMode::Dynamic
+        RigidBody::Dynamic
     }
 }
 
@@ -231,7 +231,7 @@ pub struct CenterOfMassWorld(pub Vec3);
 #[derive(Debug, Default)]
 pub struct InverseInertiaTensorWorld(pub Mat3);
 
-#[derive(Debug, Component, Inspectable)]
+#[derive(Debug, Component, Inspectable, Copy, Clone)]
 pub struct Aabb {
     pub mins: Vec3,
     pub maxs: Vec3,
@@ -264,6 +264,22 @@ impl AddAssign<Vec3> for Aabb {
 }
 
 impl Aabb {
+
+    pub fn grow(&mut self, p: Vec3) {
+        self.mins = self.mins.min(p);
+        self.maxs = self.maxs.max(p);
+    }
+
+    pub fn grow_aabb(&mut self, b: &Aabb) {
+        self.grow(b.mins);
+        self.grow(b.maxs);
+    }
+
+    pub fn area(&self) -> f32 {
+        let e = self.maxs - self.mins; // box extent
+        e.x * e.y + e.y * e.z + e.z * e.x
+    }
+
     pub fn get_world_aabb(&self, trans: &Transform) -> AabbWorld {
         let corners = [
             Vec3::new(self.mins.x, self.mins.y, self.mins.z),
@@ -285,6 +301,7 @@ impl Aabb {
         AabbWorld(bounds)
     }
 
+    // TODO: test this vs grow
     pub fn expand_by_point(&mut self, rhs: Vec3) {
         self.mins = Vec3::select(rhs.cmplt(self.mins), rhs, self.mins);
         self.maxs = Vec3::select(rhs.cmpgt(self.maxs), rhs, self.maxs);

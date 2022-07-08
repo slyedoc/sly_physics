@@ -9,7 +9,6 @@ pub enum Collider {
     Cuboid { size: Vec3 },
 }
 
-
 impl Default for Collider {
     fn default() -> Self {
         Self::Sphere {

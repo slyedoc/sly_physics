@@ -2,7 +2,7 @@ use bevy::{math::vec3, prelude::*, window::PresentMode};
 use bevy_inspector_egui::{WorldInspectorPlugin, InspectorPlugin, Inspectable};
 use helper::{AppState, HelperPlugin};
 use sly_camera_controller::*;
-use sly_physics::{Collider,  PhysicsPlugin, RigidbodyBundle, RigidBodyMode, PhysicsConfig, PHYSISCS_TIMESTEP};
+use sly_physics::{Collider,  PhysicsPlugin, RigidBodyBundle, RigidBody, PhysicsConfig, PHYSISCS_TIMESTEP};
 mod helper;
 
 fn main() {
@@ -64,9 +64,9 @@ pub fn setup(
             }),
             ..default()
         })
-        .insert_bundle(RigidbodyBundle {
+        .insert_bundle(RigidBodyBundle {
             collider: Collider::Sphere { radius: 100.0 },
-            mode: RigidBodyMode::Static,
+            mode: RigidBody::Static,
             ..default()
         })
         .insert(Name::new("Ground"));
@@ -90,9 +90,9 @@ pub fn setup(
                         transform: Transform::from_translation(pos),
                         ..default()
                     })
-                    .insert_bundle(RigidbodyBundle {
+                    .insert_bundle(RigidBodyBundle {
                         collider: Collider::Sphere { radius },
-                        mode: RigidBodyMode::Dynamic,
+                        mode: RigidBody::Dynamic,
                         ..default()
                     })
                     .insert(Name::new(format!("Sphere ({}, {}, {})", i, j, k)));
