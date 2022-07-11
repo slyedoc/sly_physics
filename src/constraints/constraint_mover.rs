@@ -1,8 +1,7 @@
-use bevy::prelude::{Entity, Query, Transform};
+use bevy::prelude::{Entity, Query};
 
 use crate::{
-    AngularVelocity, CenterOfMass, Elasticity, Friction, InertiaTensor, InverseInertiaTensor,
-    InverseMass, LinearVelocity,
+    LinearVelocity,
 };
 
 pub struct ConstraintMoverSimple {
@@ -19,8 +18,7 @@ impl ConstraintMoverSimple {
     fn pre_solve(
         &mut self,
         rb_query: &mut Query<&mut LinearVelocity>,
-        a: Entity,
-        b: Entity,
+        a: Entity,        
         dt_sec: f32,
     ) {
         self.time += dt_sec;

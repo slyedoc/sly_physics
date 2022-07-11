@@ -2,7 +2,7 @@ use bevy::{
     diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
     prelude::*,
 };
-use sly_physics::{PhysicsState, DebugState};
+use sly_physics::prelude::*;
 
 use super::Keep;
 

@@ -2,7 +2,7 @@ use std::mem::swap;
 
 use crate::{    
     tlas::{Tlas, TlasNode},
-    tri::Tri,
+    tri::BvhTri,
     bvh::{Bvh, BvhInstance},
     Aabb, 
 };
@@ -22,7 +22,7 @@ pub struct Hit {
 impl Default for Hit {
     fn default() -> Self {
         Self {
-            distance: 1e30f32,
+            distance: f32::MAX,
             u: Default::default(),
             v: Default::default(),
             tri_index: Default::default(),
@@ -100,7 +100,7 @@ impl Ray {
     // Moller Trumbore
     // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     #[inline(always)]
-    pub fn intersect_triangle(&mut self, tri: &Tri, tri_index: usize, entity: Entity) {
+    pub fn intersect_triangle(&mut self, tri: &BvhTri, tri_index: usize, entity: Entity) {
         #[cfg(feature = "trace")]
         let _span = info_span!("intersect_triangle").entered();
         let edge1 = tri.vertex1 - tri.vertex0;
@@ -170,7 +170,7 @@ impl Ray {
         let t_hit = if let Some(hit) = self.hit {
             hit.distance
         } else {
-            1e30f32
+            f32::MAX
         };
 
         if tmax >= tmin && tmin < t_hit && tmax > 0.0 {
@@ -205,7 +205,7 @@ impl Ray {
                 swap(&mut dist1, &mut dist2);
                 swap(&mut child1, &mut child2);
             }
-            if dist1 == 1e30f32 {
+            if dist1 == f32::MAX {
                 if stack.is_empty() {
                     break;
                 }
@@ -237,9 +237,9 @@ impl Ray {
     }
 
     pub fn intersect_tlas(&mut self, tlas: &Tlas) -> Option<Hit> {        
-        if tlas.tlas_nodes.is_empty() {
-           return None
-        }        
+        if tlas.tlas_nodes.is_empty() || tlas.blas.is_empty() {
+            return None;
+        }
         let mut stack = Vec::<&TlasNode>::with_capacity(64);
         let mut node = &tlas.tlas_nodes[0];
         loop {
@@ -260,7 +260,7 @@ impl Ray {
                 swap(&mut dist1, &mut dist2);
                 swap(&mut child1, &mut child2);
             }
-            if dist1 == 1e30f32 {
+            if dist1 == f32::MAX {
                 if stack.is_empty() {
                     break;
                 } else {
@@ -268,7 +268,7 @@ impl Ray {
                 }
             } else {
                 node = child1;
-                if dist2 != 1e30f32 {
+                if dist2 != f32::MAX {
                     stack.push(child2);
                 }
             }

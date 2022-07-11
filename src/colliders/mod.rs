@@ -1,12 +1,16 @@
 
+mod convex_hull;
 use bevy::{prelude::*, math::vec3};
 use bevy_inspector_egui::Inspectable;
 use crate::{Aabb};
+pub use convex_hull::*;
 
+// Avoiding Box<dyn Trait> as to try and keep everything on the stack
 #[derive(Component, Inspectable, Debug)]
 pub enum Collider {
     Sphere { radius: f32 },
     Cuboid { size: Vec3 },
+    ConvexHull,
 }
 
 impl Default for Collider {
@@ -30,6 +34,7 @@ impl Collider {
         match self {
             Collider::Sphere { radius: _ } => vec3(0.0, 0.0, 0.0),
             Collider::Cuboid { size: _,} => vec3(0.0, 0.0, 0.0),
+            Collider::ConvexHull => vec3(0.0, 0.0, 0.0),
         }
     }
     
@@ -66,6 +71,9 @@ impl Collider {
                 // together
                 tensor + pat_tensor
             },
+            Collider::ConvexHull => {
+                todo!()
+            },
         }
 
     }
@@ -85,15 +93,36 @@ impl Collider {
                     maxs: half_size,
                 }
             },
+            Collider::ConvexHull => {
+                todo!()
+            },
         }
     }
 
 
-    
+    pub fn get_verts(&self) -> Vec<Vec3> {
+        match self {
+            Collider::Sphere { radius: _ } => vec![Vec3::ZERO],
+            Collider::Cuboid { size } => {
+                let half_size = *size * 0.5;
+                vec![
+                    Vec3::new(-half_size.x, -half_size.y, -half_size.z),
+                    Vec3::new(-half_size.x, -half_size.y, half_size.z),
+                    Vec3::new(-half_size.x, half_size.y, -half_size.z),
+                    Vec3::new(-half_size.x, half_size.y, half_size.z),
+                    Vec3::new(half_size.x, -half_size.y, -half_size.z),
+                    Vec3::new(half_size.x, -half_size.y, half_size.z),
+                    Vec3::new(half_size.x, half_size.y, -half_size.z),
+                    Vec3::new(half_size.x, half_size.y, half_size.z),
+                ]
+            },
+            Collider::ConvexHull => unimplemented!(),
+        }
+    }
 
     /// Given a set of points, fit an axis oriented bounding box to the vertices by finding the
     /// extents of the mesh.
-    pub fn get_aabb_mesh(vertices: &[Vec3]) -> Aabb {
+    pub fn get_aabb_mesh(vertices: &[Vec3]) -> Aabb {        
         let mut maximums = Vec3::new(f32::MIN, f32::MIN, f32::MIN);
         let mut minimums = Vec3::new(f32::MAX, f32::MAX, f32::MAX);
         for vertex in vertices.iter() {
@@ -127,6 +156,9 @@ impl Collider {
                 }
                 max_speed        
             },
+            Collider::ConvexHull => {
+                todo!()
+            },
         }
     }
 
@@ -149,9 +181,13 @@ impl Collider {
             
                 let norm = dir.normalize() * bias;
                 max_pt + norm
-
+            },
+            Collider::ConvexHull => {
+                todo!()
             },
         }
         
     }
 }
+
+

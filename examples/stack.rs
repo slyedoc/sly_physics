@@ -5,9 +5,7 @@ use bevy::{math::vec3, prelude::*, window::PresentMode};
 use bevy_inspector_egui::{Inspectable, InspectorPlugin, WorldInspectorPlugin};
 use helper::{AppState, HelperPlugin};
 use sly_camera_controller::*;
-use sly_physics::{
-    Collider, PhysicsConfig, PhysicsPlugin, RigidBody, RigidBodyBundle, PHYSISCS_TIMESTEP, LinearVelocity, Mass,
-};
+use sly_physics::prelude::*;
 mod helper;
 
 fn main() {
@@ -85,7 +83,7 @@ pub fn setup_room(
             collider: Collider::Cuboid {
                 size: vec3(floor_size, 1.0, floor_size),
             },
-            mode: RigidBody::Static,
+            mode: RigidBodyMode::Static,
             ..default()
         })
         .insert(Name::new("Floor"));
@@ -113,7 +111,7 @@ pub fn setup_room(
                 collider: Collider::Cuboid {
                     size: vec3(floor_size, wall_height, 1.0),
                 },
-                mode: RigidBody::Static,
+                mode: RigidBodyMode::Static,
                 ..default()
             })
             .insert(Name::new("Wall"));

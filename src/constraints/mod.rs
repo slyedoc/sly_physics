@@ -6,7 +6,7 @@ mod constraint_motor;
 mod constraint_mover;
 mod constraint_orientation;
 mod constraint_penetration;
-pub mod manifold;
+mod manifold;
 
 use crate::{
     math::{MatMN, VecN},
@@ -22,8 +22,7 @@ use bevy::prelude::*;
 // use constraint_mover::ConstraintMoverSimple;
 // use constraint_orientation::ConstraintOrientation;
 pub use constraint_penetration::*;
-
-use manifold::ManifoldArena;
+pub use manifold::*;
 
 pub fn solve_contraints(
     mut rb_query: Query<(
@@ -55,7 +54,6 @@ pub fn solve_contraints(
             }
         }
     }
-
 }
 
 pub fn cleanpup_contraints(

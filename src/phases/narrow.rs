@@ -1,6 +1,12 @@
-use bevy::{math::vec3, prelude::*};
+use bevy::{prelude::*, math::vec3};
 
-use crate::*;
+use crate::{
+    PhysicsConfig,
+    constraints::ManifoldArena,
+    intersect::{*},
+    types::{*},
+    colliders::{*},
+};
 
 #[cfg(not(feature = "static"))]
 pub fn narrow_system(
@@ -16,15 +22,18 @@ pub fn narrow_system(
     mut broad_contacts: EventReader<BroadContact>,
     mut contacts: EventWriter<Contact>,
     mut manifold_arean: ResMut<ManifoldArena>,
-    meshes: Res<Assets<Mesh>>,
+    convex_meshes: Res<Assets<Mesh>>,
     config: Res<PhysicsConfig>,
 ) {
-    use crate::intersect::{gjk_closest_points, gjk_does_intersect, sphere_sphere_dynamic};
-
     for pair in broad_contacts.iter() {
-        let [(mut trans_a, type_a, lin_vel_a, mut ang_vel_a, com_a, i_tensor_a, mesh_handle_a), (mut trans_b, type_b, lin_vel_b, mut ang_vel_b, com_b, i_tensor_b, mesh_handle_b)] =
-            query.many_mut([pair.a, pair.b]);
-
+        
+        let bodies = query.get_many_mut([pair.a, pair.b]);
+        if bodies.is_err() {
+            warn!("narrow_system: bodies not found");  
+            continue;
+        }
+        
+        let [(mut trans_a, type_a, lin_vel_a, mut ang_vel_a, com_a, i_tensor_a, mesh_handle_a), (mut trans_b, type_b, lin_vel_b, mut ang_vel_b, com_b, i_tensor_b, mesh_handle_b)] = bodies.unwrap();
         match (type_a, type_b) {
             (Collider::Sphere { radius: radius_a }, Collider::Sphere { radius: radius_b }) => {
                 if let Some((world_point_a, world_point_b, time_of_impact)) = sphere_sphere_dynamic(
@@ -107,11 +116,9 @@ pub fn narrow_system(
                     // check for intersection
                     const BIAS: f32 = 0.001;
 
-                    let mesh_a = meshes.get(mesh_handle_a).unwrap();
-                    let mesh_b = meshes.get(mesh_handle_b).unwrap();
-                    let verts_a = parse_verties(mesh_a);
-                    let verts_b = parse_verties(mesh_b);
-
+                    let verts_a = parse_verties(&convex_meshes.get(mesh_handle_a).unwrap());
+                    let verts_b = parse_verties(&convex_meshes.get(mesh_handle_b).unwrap());
+   
                     if let Some((mut world_point_a, mut world_point_b)) = gjk_does_intersect(
                         &collider_a,
                         &trans_a,
@@ -253,6 +260,26 @@ pub fn narrow_system(
     }
 }
 
+fn parse_verties(mesh: &Mesh) -> Vec<Vec3> {
+    match mesh.primitive_topology() {
+        bevy::render::mesh::PrimitiveTopology::TriangleList => {
+
+            let verts = match mesh
+                .attribute(Mesh::ATTRIBUTE_POSITION)
+                .expect("No Position Attribute")
+            {
+                bevy::render::mesh::VertexAttributeValues::Float32x3(vec) => {
+                    vec.iter().map(|vec| vec3(vec[0], vec[1], vec[2]))
+                }
+                _ => todo!(),
+            }
+            .collect::<Vec<_>>();
+            verts
+        }
+        _ => todo!(),
+    }
+}
+
 #[cfg(feature = "static")]
 pub fn narrow_system(
     query: Query<(&Transform, &Collider)>,
@@ -289,42 +316,5 @@ pub fn narrow_system(
             }
             (_, _) => todo!(),
         }
-    }
-}
-
-pub fn parse_verties(mesh: &Mesh) -> Vec<Vec3> {
-    match mesh.primitive_topology() {
-        bevy::render::mesh::PrimitiveTopology::TriangleList => {
-            // let indexes = match mesh.indices().expect("No Indices") {
-            //     bevy::render::mesh::Indices::U32(vec) => vec,
-            //     _ => todo!(),
-            // };
-
-            let verts = match mesh
-                .attribute(Mesh::ATTRIBUTE_POSITION)
-                .expect("No Position Attribute")
-            {
-                bevy::render::mesh::VertexAttributeValues::Float32x3(vec) => {
-                    vec.iter().map(|vec| vec3(vec[0], vec[1], vec[2]))
-                }
-                _ => todo!(),
-            }
-            .collect::<Vec<_>>();
-
-            // let mut triangles = Vec::with_capacity(indexes.len() / 3);
-            // for tri_indexes in indexes.chunks(3)
-            //  {
-            //     let v0 = verts[tri_indexes[0] as usize];
-            //     let v1 = verts[tri_indexes[1] as usize];
-            //     let v2 = verts[tri_indexes[2] as usize];
-            //     triangles.push(Tri::new(
-            //         vec3(v0[0], v0[1], v0[2]),
-            //         vec3(v1[0], v1[1], v1[2]),
-            //         vec3(v2[0], v2[1], v2[2]),
-            //     ));
-            // }
-            verts
-        }
-        _ => todo!(),
     }
 }

@@ -5,6 +5,12 @@ use bevy_inspector_egui::Inspectable;
 
 use crate::{MAX_ANGULAR_SPEED_SQ, MAX_ANGULAR_SPEED};
 
+#[derive(Debug)]
+pub struct BroadContact {
+    pub a: Entity,
+    pub b: Entity,
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct Contact {
     pub a: Entity,
@@ -163,14 +169,14 @@ impl RBHelper {
 }
 
 #[derive(Component, Inspectable, Debug, PartialEq, Eq)]
-pub enum RigidBody {
+pub enum RigidBodyMode {
     Static,
     Dynamic,
 }
 
-impl Default for RigidBody {
+impl Default for RigidBodyMode {
     fn default() -> Self {
-        RigidBody::Dynamic
+        RigidBodyMode::Dynamic
     }
 }
 
@@ -216,11 +222,8 @@ pub struct InverseMass(pub f32);
 #[derive(Component, Inspectable, Debug, Default)]
 pub struct CenterOfMass(pub Vec3);
 
-
-
 #[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
 pub struct InertiaTensor(pub Mat3);
-
 
 #[derive(Component, Inspectable, Debug, Default)]
 pub struct InverseInertiaTensor(pub Mat3);
@@ -265,6 +268,11 @@ impl AddAssign<Vec3> for Aabb {
 
 impl Aabb {
 
+    // TODO: preformance test form_points vs grow vs add_assign vs expand_by_point, all doing same thing
+    pub fn from_points(pts: &[Vec3]) -> Self {
+        pts.iter().fold(Aabb::default(), |acc, pt| acc + *pt)
+    }
+
     pub fn grow(&mut self, p: Vec3) {
         self.mins = self.mins.min(p);
         self.maxs = self.maxs.max(p);
@@ -292,20 +300,25 @@ impl Aabb {
             Vec3::new(self.mins.x, self.maxs.y, self.maxs.z),
         ];
 
-        let mut bounds = Aabb::default();
+        let mut aabb = Aabb::default();
         for pt in &corners {
             let pt = (trans.rotation * *pt) + trans.translation;
-            bounds.expand_by_point(pt);
+            aabb.expand_by_point(pt);
         }
 
-        AabbWorld(bounds)
+        AabbWorld(aabb)
     }
 
-    // TODO: test this vs grow
+    
     pub fn expand_by_point(&mut self, rhs: Vec3) {
         self.mins = Vec3::select(rhs.cmplt(self.mins), rhs, self.mins);
         self.maxs = Vec3::select(rhs.cmpgt(self.maxs), rhs, self.maxs);
     }
+
+    pub fn width(&self) -> Vec3 {
+        self.maxs - self.mins
+    }
+
 }
 
 #[derive(Debug, Deref, DerefMut, Default, Component, Inspectable)]

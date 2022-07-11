@@ -1,15 +1,9 @@
 use bevy::prelude::*;
 
-use crate::AabbWorld;
+use crate::types::{AabbWorld, RigidBodyMode, BroadContact};
 
 
 
-
-#[derive(Debug)]
-pub struct BroadContact {
-    pub a: Entity,
-    pub b: Entity,
-}
 
 // TODO: Use my bvh for space partitioning next
 
@@ -18,7 +12,7 @@ pub struct BroadContact {
 // So far this simple approach has been the fastest
 pub fn broadphase_system(
     mut broad_contacts: EventWriter<BroadContact>,
-    query: Query<(Entity, &AabbWorld)>,
+    query: Query<(Entity, &AabbWorld), With<RigidBodyMode>>,
 ) {
     // TODO: Yes, we are copying the array out here, only way to sort it
     // Ideally we would keep the array around, it should already near sorted

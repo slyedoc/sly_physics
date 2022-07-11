@@ -1,4 +1,4 @@
-use crate::{Aabb, tri::Tri, BVH_BIN_COUNT};
+use crate::{Aabb, tri::BvhTri, BVH_BIN_COUNT};
 use bevy::{math::vec3, prelude::*, reflect::TypeUuid};
 
 #[derive(Default, Debug)]
@@ -60,13 +60,18 @@ impl BvhInstance {
 #[uuid = "81299f9d-41e0-4ff0-86b7-6bef6c3f67c1"]
 pub struct Bvh {
     pub nodes: Vec<BvhNode>,
-    pub tris: Vec<Tri>,
+    pub tris: Vec<BvhTri>,
     pub triangle_indexs: Vec<usize>,
 }
 
 impl Bvh {
-    // TODO: need far better way to get tris from bevy mesh
-    pub fn new(triangles: Vec<Tri>) -> Bvh {
+    // TODO: for now bvh get a copy of there down tris, this allows tlas to self contained
+    // allowing for tlas intersection to used with any other resources, and no need for events
+    // PRO: This last part is the largest reason for keeping it like this, not needing to wait on a
+    // raycast makes using it alot more friendly
+    pub fn new(triangles: Vec<BvhTri>) -> Bvh {
+        info!("triangles: {:?}", triangles.len());
+        assert!(triangles.len() > 0);
         let count = triangles.len() as u32;
         let mut bvh = Bvh {
             tris: triangles,
@@ -115,8 +120,8 @@ impl Bvh {
 
     fn update_node_bounds(&mut self, node_idx: usize) {
         let node = &mut self.nodes[node_idx];
-        node.aabb.mins = Vec3::splat(1e30f32);
-        node.aabb.maxs = Vec3::splat(-1e30f32);
+        node.aabb.mins = Vec3::splat(f32::MAX);
+        node.aabb.maxs = Vec3::splat(-f32::MAX);
         for i in 0..node.tri_count {
             let leaf_tri_index = self.triangle_indexs[(node.left_first + i) as usize];
             let leaf_tri = self.tris[leaf_tri_index];
@@ -183,11 +188,11 @@ impl Bvh {
         // determine split axis using SAH
         let mut best_axis = 0;
         let mut split_pos = 0.0f32;
-        let mut best_cost = 1e30f32;
+        let mut best_cost = f32::MAX;
 
         for a in 0..3 {
-            let mut bounds_min = 1e30f32;
-            let mut bounds_max = -1e30f32;
+            let mut bounds_min = f32::MAX;
+            let mut bounds_max = -f32::MAX;
             for i in 0..node.tri_count {
                 let triangle = &self.tris[self.triangle_indexs[(node.left_first + i) as usize]];
                 bounds_min = bounds_min.min(triangle.centroid[a]);

@@ -28,7 +28,6 @@ impl ManifoldArena {
         }
     }
 
-
     pub fn clear(&mut self) {
         self.manifolds.clear();
     }
@@ -58,7 +57,8 @@ impl Manifold {
         com_b: &CenterOfMass,
         contact: Contact,
     ) {
-        // make sure the contact's body_a and body_b are of the correct order
+        // TODO: Need to make sure the contact's body_a and body_b are of the correct order
+        // 
 
         // if this contact is close to another contact then keep the old contact
         for manifold_contact in &self.contacts {
@@ -85,8 +85,6 @@ impl Manifold {
 
         // if we're all full on contacts then keep the contacts that are furthest away from each
         // other
-        
-
         let index = if self.contacts.len() == MAX_MANIFOLD_CONTACTS  {
             let mut avg = Vec3::ZERO;
             for manifold_contact in &self.contacts {
@@ -99,7 +97,6 @@ impl Manifold {
             let mut new_idx = None;
             for (i, c) in self.contacts.iter().enumerate() {
                 let dist2 = (avg - c.local_point_a).length_squared();
-
                 if dist2 < min_dist {
                     min_dist = dist2;
                     new_idx = Some(i);

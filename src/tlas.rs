@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 
-
 use crate::{ Bvh, BvhInstance, Aabb};
 
 #[derive(Default, Debug, Copy, Clone)]
@@ -34,6 +33,8 @@ impl Default for Tlas {
 }
 
 impl Tlas {
+
+    
     pub fn add_bvh(&mut self, bvh: Bvh) -> usize {
         self.bvhs.push(bvh);
         self.bvhs.len() - 1
@@ -114,7 +115,7 @@ impl Tlas {
         best_b
     }
 
-    pub fn update_bvh_instances(&mut self, query: &Query<&GlobalTransform>) {
-
+    pub fn update_bvh_instances(&mut self, _query: &Query<&GlobalTransform>) {
+        // TODO: refit
     }
 }

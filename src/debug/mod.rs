@@ -1,3 +1,5 @@
+pub mod bvh_camera;
+
 use crate::{Aabb, AabbWorld, PhysicsSystems, PHYSISCS_TIMESTEP, PhysicsState};
 use bevy::{
     prelude::*,
@@ -71,10 +73,10 @@ pub struct PhysicsDebug;
 
 pub fn spawn_debug(
     mut commands: Commands,
-    query: Query<(Entity, &Aabb, &AabbWorld, &Transform), Without<AabbWorldDebug>>,
+    query: Query<(Entity, &AabbWorld, &Transform), Without<AabbWorldDebug>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    for (e, aabb, aabb_world, _trans) in query.iter() {
+    for (e, aabb_world, _trans) in query.iter() {
         // Spawn aabb, creating new entity seen we dont want rotation
         // {
         //     let id = commands

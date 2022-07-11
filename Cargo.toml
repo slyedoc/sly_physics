@@ -24,6 +24,7 @@ trace = ["bevy/trace", "bevy/trace_chrome"]
 [dependencies]
 bevy =  { version = "0.7.0" }
 bevy-inspector-egui = "0.11.0"
+iyes_loopless = { git = "https://github.com/NiklasEi/iyes_loopless", branch = "loopless-schedule-ext-trait", features = ["states"] }
 
 #glam = { version = "0.20.0", features = ["serde", "glam-assert"] }
 
