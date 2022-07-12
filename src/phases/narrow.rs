@@ -1,4 +1,4 @@
-use bevy::{prelude::*, math::vec3};
+use bevy::prelude::*;
 
 use crate::{
     PhysicsConfig,
@@ -17,12 +17,11 @@ pub fn narrow_system(
         &mut AngularVelocity,
         &CenterOfMass,
         &InertiaTensor,
-        &Handle<Mesh>,
+        &GJKVerts,
     )>,
     mut broad_contacts: EventReader<BroadContact>,
     mut contacts: EventWriter<Contact>,
     mut manifold_arean: ResMut<ManifoldArena>,
-    convex_meshes: Res<Assets<Mesh>>,
     config: Res<PhysicsConfig>,
 ) {
     for pair in broad_contacts.iter() {
@@ -33,7 +32,7 @@ pub fn narrow_system(
             continue;
         }
         
-        let [(mut trans_a, type_a, lin_vel_a, mut ang_vel_a, com_a, i_tensor_a, mesh_handle_a), (mut trans_b, type_b, lin_vel_b, mut ang_vel_b, com_b, i_tensor_b, mesh_handle_b)] = bodies.unwrap();
+        let [(mut trans_a, type_a, lin_vel_a, mut ang_vel_a, com_a, i_tensor_a, gjk_verts_a), (mut trans_b, type_b, lin_vel_b, mut ang_vel_b, com_b, i_tensor_b, gjk_verts_b)] = bodies.unwrap();
         match (type_a, type_b) {
             (Collider::Sphere { radius: radius_a }, Collider::Sphere { radius: radius_b }) => {
                 if let Some((world_point_a, world_point_b, time_of_impact)) = sphere_sphere_dynamic(
@@ -115,17 +114,14 @@ pub fn narrow_system(
                 while dt > 0.0 {
                     // check for intersection
                     const BIAS: f32 = 0.001;
-
-                    let verts_a = parse_verties(&convex_meshes.get(mesh_handle_a).unwrap());
-                    let verts_b = parse_verties(&convex_meshes.get(mesh_handle_b).unwrap());
    
                     if let Some((mut world_point_a, mut world_point_b)) = gjk_does_intersect(
                         &collider_a,
                         &trans_a,
-                        &verts_a,
+                        &gjk_verts_a.0,
                         &collider_b,
                         &trans_b,
-                        &verts_b,
+                        &gjk_verts_b.0,
                         BIAS,
                     ) {
                         let normal = (world_point_b - world_point_a).normalize_or_zero();
@@ -185,10 +181,10 @@ pub fn narrow_system(
                     let (world_point_a, world_point_b) = gjk_closest_points(
                         &collider_a,
                         &trans_a,
-                        &verts_a,
+                        &gjk_verts_a.0,
                         &collider_b,
                         &trans_b,
-                        &verts_b,
+                        &gjk_verts_b.0,
                     );
                     let separation_dist = (world_point_a - world_point_b).length();
 
@@ -257,26 +253,6 @@ pub fn narrow_system(
                 );
             }
         }
-    }
-}
-
-fn parse_verties(mesh: &Mesh) -> Vec<Vec3> {
-    match mesh.primitive_topology() {
-        bevy::render::mesh::PrimitiveTopology::TriangleList => {
-
-            let verts = match mesh
-                .attribute(Mesh::ATTRIBUTE_POSITION)
-                .expect("No Position Attribute")
-            {
-                bevy::render::mesh::VertexAttributeValues::Float32x3(vec) => {
-                    vec.iter().map(|vec| vec3(vec[0], vec[1], vec[2]))
-                }
-                _ => todo!(),
-            }
-            .collect::<Vec<_>>();
-            verts
-        }
-        _ => todo!(),
     }
 }
 

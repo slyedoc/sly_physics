@@ -33,8 +33,7 @@ impl Default for Tlas {
 }
 
 impl Tlas {
-
-    
+  
     pub fn add_bvh(&mut self, bvh: Bvh) -> usize {
         self.bvhs.push(bvh);
         self.bvhs.len() - 1
@@ -45,9 +44,11 @@ impl Tlas {
     }
 
     pub fn build(&mut self) {
-        self.tlas_nodes = Vec::with_capacity(self.blas.len() + 1);
+        self.tlas_nodes.clear();
+        self.tlas_nodes.reserve(self.blas.len() + 1);
         // reserve root node
         self.tlas_nodes.push(TlasNode::default());
+        
 
         let mut node_index = vec![0u32; self.blas.len() + 1];
         let mut node_indices = self.blas.len() as i32;
@@ -115,7 +116,20 @@ impl Tlas {
         best_b
     }
 
-    pub fn update_bvh_instances(&mut self, _query: &Query<&GlobalTransform>) {
-        // TODO: refit
+    pub fn update_bvh_instances(&mut self, query: &Query<&Transform>) {
+        
+        let mut remove_list = Vec::new();
+        for instance in &mut self.blas {
+            let bvh = &self.bvhs[instance.bvh_index];
+            if let Ok(trans) = query.get(instance.entity) {
+                instance.update(trans, &bvh.nodes[0]);
+            } else {
+                remove_list.push(instance.entity);
+            }
+        }
+        
+        //remove any not found
+        self.blas.retain(|b| !remove_list.contains(&b.entity) )
+        
     }
 }

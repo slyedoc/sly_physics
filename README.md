@@ -3,22 +3,29 @@
 
 A ECS Bevy physics plugin.
 
-Most likely you should go use rapier.
+Most likely you should go use rapier, this is a moon shot.
 
-This is where I am teaching myself what goes into a physiscs engine, the goal is have a working physiscs engine in one crate, thats good only for games, and easy to use.  Then upgrading and focusing on performance, 
+This is where I am teaching myself what goes into a physiscs engine, the goal is have a working physiscs engine in one crate, thats good only for games, and easy to use.  Hope to focusing on performance.
 
 # Why
 
 I have playing with bevy for a while now and the only real option you have for physics is [Rapier](https://github.com/dimforge/rapier), either though [bevy_rapier](https://github.com/dimforge/bevy_rapier) or [heron](https://github.com/jcornaz/heron) or Physx. Physx is a no for wasm support and removing unsafe things.  While rapier is truly amazing, I wanted a bevy native experence using the ecs that I can understand and hack on in one repo.
 
-## Run Locally
+# Status
 
-Follow the `Install OS dependencies` at [bevy book](https://bevyengine.org/learn/book/getting-started/setup/).
 
-```bash
-cargo run  --release --example stack
-```
 
+ - [x] Colliders
+   - [ ] Sphere
+   - [ ] Cu
+ - [x] Phases
+   - [x] Broad - prune_and_sweep, working on bvh
+   - [x] Narrow
+     - [x] Continouns
+       - [x] Sphere vs Sphere
+       - [ ] Box, using gj
+       - [x] GJK
+      - [ ] 
 ## Credit
 
 - [Game Physics in One Weekend](https://gamephysicsweekend.github.io/)

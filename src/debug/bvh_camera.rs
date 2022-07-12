@@ -1,32 +1,28 @@
-use crate::{PhysicsSystems, Ray, Tlas};
+use crate::{
+    tasks::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystems, Ray, Tlas,
+};
 use bevy::{
     math::vec3,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
     tasks::*,
 };
+use iyes_loopless::prelude::*;
+
+use super::PhysicsDebugState;
 
 pub struct PhysicsBvhCameraPlugin;
 
 // Really should only be used to debug and profile bvh
 impl Plugin for PhysicsBvhCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set_to_stage(
-            CoreStage::PostUpdate,
-            SystemSet::new()
-                .after(PhysicsSystems::Resolved)
-                .with_system(init_camera_image)
-                .with_system(update_camera.after(init_camera_image))
-                .with_system(display_camera)
-                .with_system(render_camera.after(update_camera))
-                .with_system(display_camera.after(render_camera)),
+        app.add_system(init_camera).add_system_to_stage(
+            PhysicsFixedUpdate,
+            render_image
+                .run_in_state(PhysicsDebugState::Running)
+                .label(PhysicsSystems::Camera)
+                .after(PhysicsSystems::ResolvePhase),
         );
-    }
-}
-
-pub fn update_camera(mut camera_query: Query<(&mut BvhCamera, &GlobalTransform)>) {
-    for (mut camera, trans) in camera_query.iter_mut() {
-        camera.update(trans);
     }
 }
 
@@ -47,6 +43,7 @@ pub struct BvhCamera {
     w: Vec3,
     pub samples: u32,
     pub image: Option<Handle<Image>>,
+    pub ui_id: Option<Entity>,
 }
 
 impl BvhCamera {
@@ -78,10 +75,11 @@ impl BvhCamera {
             v: Vec3::ZERO,
             w: Vec3::ONE,
             image: None,
+            ui_id: None,
         }
     }
 
-    pub fn update(&mut self, trans: &GlobalTransform) {
+    pub fn update(&mut self, trans: &Transform) {
         self.origin = trans.translation;
 
         self.w = -trans.forward();
@@ -109,10 +107,41 @@ impl BvhCamera {
     }
 }
 
-pub fn display_camera(mut commands: Commands, camera_query: Query<&BvhCamera> ) {
-    if let Ok(camera) = camera_query.get_single() {
-        if let Some(image) = &camera.image {
-            commands
+#[derive(Component)]
+struct BvhImage;
+
+pub fn init_camera(
+    mut commands: Commands,
+    mut camera_query: Query<&mut BvhCamera>,
+    node_query: Query<&Node>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    for mut camera in camera_query.iter_mut() {
+        if camera.image.is_none() {
+            let image = images.add(Image::new(
+                Extent3d {
+                    width: camera.width as u32,
+                    height: camera.height as u32,
+                    depth_or_array_layers: 1,
+                },
+                TextureDimension::D2,
+                vec![0; (camera.width * camera.height) as usize * 4],
+                TextureFormat::Rgba8UnormSrgb,
+            ));
+
+            camera.image = Some(image);
+        }
+
+        if let Some(id) = camera.ui_id {
+            if node_query.get(id).is_err() {
+                camera.ui_id = None;
+            }
+        }
+
+        if camera.ui_id.is_none() {
+            let image_handle = camera.image.as_ref().unwrap().clone();
+
+            let id = commands
                 .spawn_bundle(ImageBundle {
                     style: Style {
                         align_self: AlignSelf::FlexEnd,
@@ -124,101 +153,65 @@ pub fn display_camera(mut commands: Commands, camera_query: Query<&BvhCamera> ) 
                         },
                         ..default()
                     },
-                    image: image.clone().into(),
+                    image: image_handle.into(),
                     ..default()
                 })
-                .insert(Name::new("BVH Image"));
+                .insert(BvhImage)
+                .insert(Name::new("BVH Image"))
+                .id();
+
+            camera.ui_id = Some(id);
         }
     }
 }
 
-pub fn init_camera_image(
-    mut query: Query<&mut BvhCamera, Added<BvhCamera>>,
-    mut images: ResMut<Assets<Image>>,
-) {
-    for mut camera in query.iter_mut() {
-        let image = images.add(Image::new(
-            Extent3d {
-                width: camera.width as u32,
-                height: camera.height as u32,
-                depth_or_array_layers: 1,
-            },
-            TextureDimension::D2,
-            vec![0; (camera.width * camera.height) as usize * 4],
-            TextureFormat::Rgba8UnormSrgb,
-        ));
-        camera.image = Some(image);
-    }
-}
-
-pub trait ParallelSliceEnumerateMut<T: Send>: AsMut<[T]> {
-    fn par_chunk_map_enumerate_mut<F, R>(
-        &mut self,
-        task_pool: &TaskPool,
-        chunk_size: usize,
-        f: F,
-    ) -> Vec<R>
-    where
-        F: Fn(usize, &mut [T]) -> R + Send + Sync,
-        R: Send + 'static,
-    {
-        let slice = self.as_mut();
-        let f = &f;
-        task_pool.scope(|scope| {
-            for (i, chunk) in slice.chunks_mut(chunk_size).enumerate() {
-                scope.spawn(async move { f(i, chunk) });
-            }
-        })
-    }
-}
-
-impl<S, T: Send> ParallelSliceEnumerateMut<T> for S where S: AsMut<[T]> {}
-
-pub fn render_camera(
-    camera_query: Query<&BvhCamera>,
+pub fn render_image(
+    mut camera_query: Query<(&mut BvhCamera, &Transform)>,
     mut images: ResMut<Assets<Image>>,
     tlas: Res<Tlas>,
     task_pool: Res<ComputeTaskPool>,
 ) {
-    if let Ok(camera) = camera_query.get_single() {
-        if let Some(image) = &camera.image {
-            let image = images.get_mut(image).unwrap();
+    // you really only want one for now
+    let (mut camera, trans) = camera_query.single_mut();
+    camera.update(&trans);
 
-            // TODO: Make this acutally tilings, currenty this just takes a slice pixels in a row
-            const PIXEL_TILE_COUNT: usize = 64;
-            const PIXEL_TILE: usize = 4 * PIXEL_TILE_COUNT;
+    if let Some(image) = &camera.image {
+        let image = images.get_mut(image).unwrap();
 
-            image
-                .data
-                .par_chunk_map_enumerate_mut(&task_pool, PIXEL_TILE, |i, pixels| {
-                    for pixel_offset in 0..(pixels.len() / 4) {
-                        let index = i * PIXEL_TILE_COUNT + pixel_offset;
-                        let offset = pixel_offset * 4;
+        // TODO: Make this acutally tilings, currenty this just takes a slice pixels in a row
+        const PIXEL_TILE_COUNT: usize = 64;
+        const PIXEL_TILE: usize = 4 * PIXEL_TILE_COUNT;
 
-                        let x = index as u32 % camera.width;
-                        let y = index as u32 / camera.width;
-                        let u = x as f32 / camera.width as f32;
-                        let v = y as f32 / camera.height as f32;
-                        // TODO: Revisit multiple samples later
-                        // if samples > 0 {
-                        //     u += rng.gen::<f32>() / camera.width as f32;
-                        //     v += rng.gen::<f32>() / camera.height as f32;
-                        // }
+        image
+            .data
+            .par_chunk_map_enumerate_mut(&task_pool, PIXEL_TILE, |i, pixels| {
+                for pixel_offset in 0..(pixels.len() / 4) {
+                    let index = i * PIXEL_TILE_COUNT + pixel_offset;
+                    let offset = pixel_offset * 4;
 
-                        // TODO: flip v since image is upside down, figure out why
-                        let mut ray = camera.get_ray(u, 1.0 - v);
-                        let color = if let Some(hit) = ray.intersect_tlas(&tlas) {
-                            vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0
-                        } else {
-                            Vec3::ZERO
-                        };
+                    let x = index as u32 % camera.width;
+                    let y = index as u32 / camera.width;
+                    let u = x as f32 / camera.width as f32;
+                    let v = y as f32 / camera.height as f32;
+                    // TODO: Revisit multiple samples later
+                    // if samples > 0 {
+                    //     u += rng.gen::<f32>() / camera.width as f32;
+                    //     v += rng.gen::<f32>() / camera.height as f32;
+                    // }
 
-                        pixels[offset] = color.x as u8;
-                        pixels[offset + 1] = color.y as u8;
-                        pixels[offset + 2] = color.z as u8;
-                        pixels[offset + 3] = 255;
-                    }
-                });
-        }
+                    // TODO: flip v since image is upside down, figure out why
+                    let mut ray = camera.get_ray(u, 1.0 - v);
+                    let color = if let Some(hit) = ray.intersect_tlas(&tlas) {
+                        vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0
+                    } else {
+                        Vec3::ZERO
+                    };
+
+                    pixels[offset] = color.x as u8;
+                    pixels[offset + 1] = color.y as u8;
+                    pixels[offset + 2] = color.z as u8;
+                    pixels[offset + 3] = 255;
+                }
+            });
     }
 }

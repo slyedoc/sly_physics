@@ -2,6 +2,7 @@ use bevy::{
     diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
     prelude::*,
 };
+use iyes_loopless::state::*;
 use sly_physics::prelude::*;
 
 use super::Keep;
@@ -185,10 +186,10 @@ fn update_fps(diagnostics: Res<Diagnostics>, mut query: Query<&mut Text, With<Fp
 }
 
 
-fn update_state(state: Res<State<PhysicsState>>, mut query: Query<&mut Text, With<PhysicsStateText>>) {
+fn update_state(state: Res<CurrentState<PhysicsState>>, mut query: Query<&mut Text, With<PhysicsStateText>>) {
     for mut text in query.iter_mut() {
-        text.sections[1].value = format!("{:?}", state.current());
-        text.sections[1].style.color = match state.current() {
+        text.sections[1].value = format!("{:?}", state.0);
+        text.sections[1].style.color = match state.0 {
             PhysicsState::Running => Color::GREEN,
             PhysicsState::Paused => Color::RED,                        
         };
@@ -196,15 +197,15 @@ fn update_state(state: Res<State<PhysicsState>>, mut query: Query<&mut Text, Wit
 }
 
 
-fn update_debug(state: Res<State<DebugState>>, mut query: Query<&mut Text, With<DebugStateText>>) {
+fn update_debug(state: Res<CurrentState<PhysicsDebugState>>, mut query: Query<&mut Text, With<DebugStateText>>) {
     for mut text in query.iter_mut() {
-        text.sections[1].value =  match state.current() {
-            DebugState::Running => "Enabled".to_string(),
-            DebugState::Paused => "Disabled".to_string(),
+        text.sections[1].value =  match state.0 {
+            PhysicsDebugState::Running => "Enabled".to_string(),
+            PhysicsDebugState::Paused => "Disabled".to_string(),
         };
-        text.sections[1].style.color = match state.current() {
-            DebugState::Running => Color::GREEN,
-            DebugState::Paused => Color::RED,                        
+        text.sections[1].style.color = match state.0 {
+            PhysicsDebugState::Running => Color::GREEN,
+            PhysicsDebugState::Paused => Color::RED,                        
         };
     }
 }

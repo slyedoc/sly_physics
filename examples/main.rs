@@ -3,6 +3,7 @@ use bevy_inspector_egui::{WorldInspectorPlugin, InspectorPlugin, Inspectable};
 use helper::{AppState, HelperPlugin};
 use sly_camera_controller::*;
 use sly_physics::{prelude::*, PHYSISCS_TIMESTEP};
+use iyes_loopless::prelude::*;
 mod helper;
 
 fn main() {
@@ -18,7 +19,7 @@ fn main() {
         .add_plugin(PhysicsPlugin)
         .add_plugin(InspectorPlugin::<Stack>::new())
         .add_startup_system(helper::setup_camera)
-        .add_system_set(SystemSet::on_enter(AppState::Playing).with_system(setup))
+        .add_enter_system(AppState::Playing, setup)
         .add_system(apply_scale)
         .run();
 }

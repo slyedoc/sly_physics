@@ -23,10 +23,22 @@ trace = ["bevy/trace", "bevy/trace_chrome"]
 
 [dependencies]
 bevy =  { version = "0.7.0" }
-bevy-inspector-egui = "0.11.0"
-iyes_loopless = { git = "https://github.com/NiklasEi/iyes_loopless", branch = "loopless-schedule-ext-trait", features = ["states"] }
+bevy-inspector-egui = { version = "0.11.0" }
+iyes_loopless = { git = "https://github.com/NiklasEi/iyes_loopless" }
 
 #glam = { version = "0.20.0", features = ["serde", "glam-assert"] }
 
 [dev-dependencies]
+bevy-inspector-egui = "0.11.0"
 sly_camera_controller = { git = "https://github.com/slyedoc/sly_camera_controller", branch = "main" }
+
+# Good example
+# [dependencies]
+# bevy_ecs = "0.7.0"
+# bevy_app = { version = "0.7.0", optional = true }
+# bevy_core = { version = "0.7.0", optional = true }
+# bevy_utils = { version = "0.7.0", optional = true }
+
+# [dev-dependencies]
+# bevy = "0.7.0"
+# rand = "0.8.5"

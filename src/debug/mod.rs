@@ -1,11 +1,13 @@
-pub mod bvh_camera;
+mod bvh_camera;
+pub use bvh_camera::*;
 
-use crate::{Aabb, AabbWorld, PhysicsSystems, PHYSISCS_TIMESTEP, PhysicsState};
+use crate::{Aabb, AabbWorld, PhysicsFixedUpdate, PhysicsState};
 use bevy::{
     prelude::*,
-    render::mesh::{Indices, PrimitiveTopology}, core::FixedTimestep, ecs::schedule::ShouldRun,
+    render::mesh::{Indices, PrimitiveTopology},
 };
 use bevy_inspector_egui::Inspectable;
+use iyes_loopless::prelude::*;
 
 #[derive(Debug, Inspectable)]
 pub struct DebugConfig {
@@ -27,7 +29,7 @@ impl Default for DebugConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
-pub enum DebugState {
+pub enum PhysicsDebugState {
     Running,
     Paused,
 }
@@ -35,27 +37,24 @@ pub enum DebugState {
 pub struct PhysicsDebugPlugin;
 impl Plugin for PhysicsDebugPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DebugConfig>()
-            .add_state(DebugState::Running)
+        app.add_loopless_state(PhysicsDebugState::Running)
+            .init_resource::<DebugConfig>()
             .add_system_set_to_stage(
-                CoreStage::PostUpdate,
-                                // workaround since you cant chain with_run_criteria, see https://github.com/bevyengine/bevy/issues/1839
-                                SystemSet::new()
-                                .with_run_criteria(FixedTimestep::step(PHYSISCS_TIMESTEP as f64).chain(
-                                    |In(input): In<ShouldRun>, state: Res<State<PhysicsState>>| {
-                                        if state.current() == &PhysicsState::Running {
-                                            input
-                                        } else {
-                                            ShouldRun::No
-                                        }
-                                    },
-                                ))
-                
-                    .after(PhysicsSystems::Resolved)
-                    .with_system(spawn_debug)
-                    .with_system(update_debug.after(spawn_debug)),
+                PhysicsFixedUpdate,
+                ConditionSet::new()
+                    .run_in_state(PhysicsDebugState::Running)
+                    .run_in_state(PhysicsState::Running)
+                    .with_system(update_debug)
+                    .into(),
             )
-            .add_system_set(SystemSet::on_enter(DebugState::Paused).with_system(remove_debug));
+            .add_system_set_to_stage(
+                PhysicsFixedUpdate,
+                ConditionSet::new()
+                    .run_in_state(PhysicsDebugState::Running)
+                    .with_system(spawn_debug)
+                    .into(),
+            )
+            .add_enter_system(PhysicsDebugState::Paused, remove_debug);
     }
 }
 
@@ -77,37 +76,18 @@ pub fn spawn_debug(
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for (e, aabb_world, _trans) in query.iter() {
-        // Spawn aabb, creating new entity seen we dont want rotation
-        // {
-        //     let id = commands
-        //         .spawn_bundle(PbrBundle {
-        //             //transform: Transform::from_translation(trans.translation),
-        //             mesh: meshes.add(Mesh::from(aabb)),
-        //             visibility: Visibility { is_visible: true },
-        //             ..Default::default()
-        //         })
-        //         .insert(PhysicsDebug)
-        //         .insert(Name::new("Aabb Debug"))
-        //         .id();
+        let id = commands
+            .spawn_bundle(PbrBundle {
+                //transform: Transform::from_translation(trans.translation),
+                mesh: meshes.add(Mesh::from(&aabb_world.0)),
+                visibility: Visibility { is_visible: true },
+                ..Default::default()
+            })
+            .insert(PhysicsDebug)
+            .insert(Name::new("Aabb World Debug"))
+            .id();
 
-        //     commands.entity(e).insert(AabbDebug(id));
-        // }
-
-        {
-            let id = commands
-                .spawn_bundle(PbrBundle {
-                    //transform: Transform::from_translation(trans.translation),
-                    mesh: meshes.add(Mesh::from(&aabb_world.0)),
-                    visibility: Visibility { is_visible: true },
-                    ..Default::default()
-                })
-                .insert(PhysicsDebug)
-                .insert(Name::new("Aabb World Debug"))
-                .id();
-
-            commands.entity(e).insert(AabbWorldDebug(id));
-
-        }
+        commands.entity(e).insert(AabbWorldDebug(id));
     }
 }
 
@@ -116,16 +96,17 @@ pub fn update_debug(
     mut mesh_query: Query<&mut Handle<Mesh>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    for ( target_aabb_world, aabb_world) in query.iter() {
-        let mut aabb_world_handle = mesh_query.get_mut(target_aabb_world.0).unwrap();
-        *aabb_world_handle = meshes.add(Mesh::from(&aabb_world.0));
+    for (target_aabb_world, aabb_world) in query.iter() {
+        if let Ok(mut aabb_world_handle) = mesh_query.get_mut(target_aabb_world.0) {
+            *aabb_world_handle = meshes.add(Mesh::from(&aabb_world.0));
+        }
         //trans_target.translation = trans_parent.translation;
     }
 }
 
 pub fn remove_debug(
-    mut commands: Commands, 
-    query: Query<Entity, (With<AabbDebug>, With<AabbWorldDebug>)>,
+    mut commands: Commands,
+    query: Query<Entity, With<AabbWorldDebug>>,
     remove_query: Query<Entity, With<PhysicsDebug>>,
 ) {
     // Remove debug components
@@ -139,7 +120,6 @@ pub fn remove_debug(
         commands.entity(e).despawn_recursive();
     }
 }
-
 
 impl From<&Aabb> for Mesh {
     fn from(aabb: &Aabb) -> Self {

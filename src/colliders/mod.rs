@@ -100,7 +100,7 @@ impl Collider {
     }
 
 
-    pub fn get_verts(&self) -> Vec<Vec3> {
+    pub fn get_gjk_verts(&self) -> Vec<Vec3> {
         match self {
             Collider::Sphere { radius: _ } => vec![Vec3::ZERO],
             Collider::Cuboid { size } => {

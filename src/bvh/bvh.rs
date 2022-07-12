@@ -1,5 +1,7 @@
-use crate::{Aabb, tri::BvhTri, BVH_BIN_COUNT};
+use crate::{Aabb, BVH_BIN_COUNT};
 use bevy::{math::vec3, prelude::*, reflect::TypeUuid};
+
+use super::BvhTri;
 
 #[derive(Default, Debug)]
 pub struct BvhNode {
@@ -38,7 +40,7 @@ impl BvhInstance {
         }
     }
 
-    pub fn update(&mut self, trans: &GlobalTransform, root: &BvhNode) {
+    pub fn update(&mut self, trans: &Transform, root: &BvhNode) {
         // Update inv transfrom matrix for faster intersections
         let trans_matrix = trans.compute_matrix();
         self.inv_trans = trans_matrix.inverse();
@@ -70,7 +72,6 @@ impl Bvh {
     // PRO: This last part is the largest reason for keeping it like this, not needing to wait on a
     // raycast makes using it alot more friendly
     pub fn new(triangles: Vec<BvhTri>) -> Bvh {
-        info!("triangles: {:?}", triangles.len());
         assert!(triangles.len() > 0);
         let count = triangles.len() as u32;
         let mut bvh = Bvh {

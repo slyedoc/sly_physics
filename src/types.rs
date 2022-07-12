@@ -234,6 +234,10 @@ pub struct CenterOfMassWorld(pub Vec3);
 #[derive(Debug, Default)]
 pub struct InverseInertiaTensorWorld(pub Mat3);
 
+// TODO: Not really happy with this, should I be using an handle and asset?
+#[derive(Debug, Component, Inspectable, Default)]
+pub struct GJKVerts(pub Vec<Vec3>);
+
 #[derive(Debug, Component, Inspectable, Copy, Clone)]
 pub struct Aabb {
     pub mins: Vec3,

@@ -3,17 +3,17 @@ use bevy::{prelude::*, render::mesh::{PrimitiveTopology, Indices}};
 use crate::types::Aabb;
 
 
-pub fn create_mesh_from_verts(verts: &[Vec3]) -> Mesh {
+pub fn create_convex_mesh_from_verts(verts: &[Vec3]) -> Mesh {
 
-    let (mut hull_pts, mut hull_tris) = build_convex_hull(&verts);
+    let (hull_pts, hull_tris) = build_convex_hull(&verts);
     
     // calculate smoothed normals
     // TODO: Could use map?
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(hull_pts.len());
-    for i in 0..(hull_pts.len() as u32) {
+    for i in 0..hull_pts.len() as u32 {
         // TODO: Could use sum?
         let mut n = Vec3::ZERO;
-        for tri in hull_tris {
+        for tri in &hull_tris {
             if i != tri.a && i != tri.b && i != tri.c {
                 continue;
             }

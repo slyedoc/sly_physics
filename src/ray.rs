@@ -1,9 +1,7 @@
 use std::mem::swap;
 
 use crate::{    
-    tlas::{Tlas, TlasNode},
-    tri::BvhTri,
-    bvh::{Bvh, BvhInstance},
+    bvh::{Bvh, BvhInstance, BvhTri, Tlas, TlasNode},
     Aabb, 
 };
 use bevy::prelude::*;
