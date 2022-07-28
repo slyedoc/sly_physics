@@ -14,7 +14,7 @@ use bevy::{math::vec3, prelude::*};
 use bevy_inspector_egui::prelude::*;
 use constraints::{cleanpup_contraints, solve_contraints, ManifoldArena};
 use iyes_loopless::prelude::*;
-use phases::{broadphase_system, narrow_system, resolve_system};
+use phases::{narrow_system, resolve_system, broadphase_system};
 
 use bvh::*;
 use colliders::*;
@@ -44,6 +44,7 @@ pub mod prelude {
         types::Friction, types::InertiaTensor, types::LinearVelocity, types::Mass,
         types::RigidBodyMode, PhysicsConfig, PhysicsPlugin, PhysicsState, PhysicsSystems,
         RigidBodyBundle, PHYSISCS_TIMESTEP,
+        PhysicsFixedUpdate,
     };
 }
 
@@ -164,6 +165,7 @@ impl Plugin for PhysicsPlugin {
                     .run_in_state(PhysicsState::Running)
                     .label(PhysicsSystems::BroadPhase)
                     .after(PhysicsSystems::UpdateBvh)
+                    //.with_system(broadphase_system_bvh)
                     .with_system(broadphase_system)
                     .into(),
             )
@@ -193,28 +195,26 @@ impl Plugin for PhysicsPlugin {
                     .after(PhysicsSystems::SolvePhase)
                     .with_system(resolve_system)
                     .into(),
-            );
-
-        //
-        //.register_inspectable::<Static>()
-        //.register_inspectable::<LinearVelocity>()
-        //.register_inspectable::<AngularVelocity>()
-        //.register_inspectable::<Elasticity>()
-        //.register_inspectable::<Friction>()
-        //.register_inspectable::<Mass>()
-        //.register_inspectable::<InverseMass>()
-        //.register_inspectable::<CenterOfMass>()
-        //.register_inspectable::<InertiaTensor>()
-        //.register_inspectable::<InverseInertiaTensor>()
-        //.register_inspectable::<Collider>()
-        //.register_inspectable::<Aabb>()
-        //.register_inspectable::<AabbWorld>()
-        //.register_inspectable::<Bvh>()
-        //.register_inspectable::<BvhCamera>()
-        //.register_inspectable::<Tlas>()
-        //.register_inspectable::<TlasNode>()
-        //.register_inspectable::<Tri>()
-        //.register_inspectable::<Aabb>()
+            )
+            .register_inspectable::<LinearVelocity>()
+            .register_inspectable::<Static>()
+            .register_inspectable::<AngularVelocity>()
+            .register_inspectable::<Elasticity>()
+            .register_inspectable::<Friction>()
+            .register_inspectable::<Mass>()
+            .register_inspectable::<InverseMass>()
+            .register_inspectable::<CenterOfMass>()
+            .register_inspectable::<InertiaTensor>()
+            .register_inspectable::<InverseInertiaTensor>()
+            .register_inspectable::<Collider>()
+            .register_inspectable::<Aabb>()
+            .register_inspectable::<AabbWorld>()
+            //.register_inspectable::<Bvh>()
+            //.register_inspectable::<debug::BvhCamera>()
+            // .register_inspectable::<Tlas>()
+            // .register_inspectable::<TlasNode>()
+            // .register_inspectable::<Tri>()
+            .register_inspectable::<Aabb>();
     }
 }
 
@@ -386,8 +386,6 @@ pub fn update_world_info(mut query: Query<(&Transform, &Aabb, &mut AabbWorld)>) 
 }
 
 // TODO: both of these update system are incomplete, for now we are rebuilding every frame
-// for now working on speeding up ray intersection
-// will come back to this
 fn update_bvh(query: Query<&Transform>, mut tlas: ResMut<Tlas>) {
     tlas.update_bvh_instances(&query);    
     tlas.build();

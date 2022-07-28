@@ -1,32 +1,14 @@
 mod bvh_camera;
 pub use bvh_camera::*;
 
-use crate::{Aabb, AabbWorld, PhysicsFixedUpdate, PhysicsState};
+use crate::{bvh::Tlas, AabbWorld, PhysicsFixedUpdate, PhysicsState};
 use bevy::{
     prelude::*,
-    render::mesh::{Indices, PrimitiveTopology},
 };
-use bevy_inspector_egui::Inspectable;
 use iyes_loopless::prelude::*;
 
-#[derive(Debug, Inspectable)]
-pub struct DebugConfig {
-    aabb: bool,
-    aabb_world: bool,
-    manifold: bool,
-    linear_velocity: bool,
-}
-
-impl Default for DebugConfig {
-    fn default() -> Self {
-        Self {
-            aabb: true,
-            aabb_world: true,
-            manifold: true,
-            linear_velocity: true,
-        }
-    }
-}
+#[derive(Component)]
+pub struct PhysicsDebug;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum PhysicsDebugState {
@@ -34,11 +16,19 @@ pub enum PhysicsDebugState {
     Paused,
 }
 
+#[derive(Component)]
+pub struct ManifoldDebug;
+
+#[derive(Component)]
+pub struct AabbDebug(pub Entity);
+
+#[derive(Component)]
+pub struct AabbWorldDebug(pub Entity);
+
 pub struct PhysicsDebugPlugin;
 impl Plugin for PhysicsDebugPlugin {
     fn build(&self, app: &mut App) {
-        app.add_loopless_state(PhysicsDebugState::Running)
-            .init_resource::<DebugConfig>()
+        app.add_loopless_state(PhysicsDebugState::Paused)
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
@@ -52,23 +42,12 @@ impl Plugin for PhysicsDebugPlugin {
                 ConditionSet::new()
                     .run_in_state(PhysicsDebugState::Running)
                     .with_system(spawn_debug)
+                    .with_system(spawn_bvh_debug)
                     .into(),
             )
             .add_enter_system(PhysicsDebugState::Paused, remove_debug);
     }
 }
-
-#[derive(Component)]
-pub struct ManifoldDebug;
-
-#[derive(Component)]
-pub struct AabbDebug(pub Entity);
-
-#[derive(Component)]
-pub struct AabbWorldDebug(pub Entity);
-
-#[derive(Component)]
-pub struct PhysicsDebug;
 
 pub fn spawn_debug(
     mut commands: Commands,
@@ -111,7 +90,7 @@ pub fn remove_debug(
 ) {
     // Remove debug components
     for e in query.iter() {
-        //commands.entity(e).remove::<AabbDebug>();
+        // commands.entity(e).remove::<AabbDebug>();
         commands.entity(e).remove::<AabbWorldDebug>();
     }
 
@@ -121,43 +100,34 @@ pub fn remove_debug(
     }
 }
 
-impl From<&Aabb> for Mesh {
-    fn from(aabb: &Aabb) -> Self {
-        /*
-              (2)-----(3)               Y
-               | \     | \              |
-               |  (1)-----(0) MAX       o---X
-               |   |   |   |             \
-          MIN (6)--|--(7)  |              Z
-                 \ |     \ |
-                  (5)-----(4)
-        */
-        let verts = vec![
-            [aabb.mins.x, aabb.maxs.y, aabb.mins.z],
-            [aabb.maxs.x, aabb.maxs.y, aabb.mins.z],
-            [aabb.mins.x, aabb.maxs.y, aabb.maxs.z],
-            [aabb.maxs.x, aabb.maxs.y, aabb.maxs.z],
-            [aabb.mins.x, aabb.mins.y, aabb.mins.z],
-            [aabb.maxs.x, aabb.mins.y, aabb.mins.z],
-            [aabb.mins.x, aabb.mins.y, aabb.maxs.z],
-            [aabb.maxs.x, aabb.mins.y, aabb.maxs.z],
-        ];
+#[derive(Component)]
+struct BvhAabbDebug;
 
-        //let mut normals = Vec::with_capacity(8);
-        let uvs = vec![[0.0, 0.0]; 8];
-        let normals = vec![[0.0, 0.0, 1.0]; 8];
+fn spawn_bvh_debug(
+    mut commands: Commands,
+    query: Query<Entity, With<BvhAabbDebug>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    tlas: Res<Tlas>,
+) {
+    //remove old
+    for e in query.iter() {
+        commands.entity(e).despawn_recursive();
+    }
 
-        let indices = Indices::U32(vec![
-            0, 1, 1, 2, 2, 3, 3, 0, // Top ring
-            4, 5, 5, 6, 6, 7, 7, 4, // Bottom ring
-            0, 4, 1, 5, 2, 6, 3, 7, // Verticals
-        ]);
-
-        let mut mesh = Mesh::new(PrimitiveTopology::LineList);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verts);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-        mesh.set_indices(Some(indices));
-        mesh
+    //add current
+    for node in &tlas.tlas_nodes {
+        if !node.is_leaf() {
+            commands
+                .spawn_bundle(PbrBundle {
+                    //transform: Transform::from_translation(trans.translation),
+                    mesh: meshes.add(Mesh::from(&node.aabb)),
+                    visibility: Visibility { is_visible: true },
+                    ..Default::default()
+                })
+                .insert(BvhAabbDebug)
+                .insert(PhysicsDebug)
+                .insert(Name::new("Bvh Aabb Debug"));
+        }
     }
 }
+

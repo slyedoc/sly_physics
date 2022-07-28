@@ -1,15 +1,57 @@
 use bevy::prelude::*;
 
-use crate::types::{AabbWorld, RigidBodyMode, BroadContact};
+use crate::{
+    bvh::Tlas,
+    types::{AabbWorld, BroadContact, RigidBodyMode},
+};
 
 
+// TODO: The we should be able to traverse the bvh tree, 'tlas' in our case, for collision detection
+// This was as the one of the main reason i added bvh
+// I am missing something here, and this is broken
+#[allow(dead_code)]
+pub fn broadphase_system_bvh(tlas: Res<Tlas>, mut broad_contacts: EventWriter<BroadContact>) {
+    let mut a = tlas.tlas_nodes[0].left();
+    let mut b = tlas.tlas_nodes[0].right();
+    let mut stack = Vec::new();
+    loop {
+        info!("test a: {}, b: {}", a, b);
+        if tlas.tlas_nodes[a].aabb.intersection(&tlas.tlas_nodes[b].aabb) {
+            if tlas.tlas_nodes[a].is_leaf() && tlas.tlas_nodes[b].is_leaf() {
+                // At leaf nodes. Perform collision tests on leaf node contents
+                broad_contacts.send(BroadContact {
+                    a: tlas.blas[tlas.tlas_nodes[a].blas as usize].entity,
+                    b: tlas.blas[tlas.tlas_nodes[b].blas as usize].entity,
+                });
+                info!("broad contact a: {}, b: {}", a, b);
+                // Could have an exit rule here (eg. exit on first hit)
 
+            } else {
+                if !tlas.tlas_nodes[a].is_leaf() { // ‘Descend A’ descent rule
+                    stack.push((tlas.tlas_nodes[a].right(), b));
+                    a = tlas.tlas_nodes[a].left();
+                    continue;
+                } else {
+                    stack.push((a, tlas.tlas_nodes[b].right()));
+                    b = tlas.tlas_nodes[b].left();
+                    continue;
+                }
+            }
+        }
+        if let Some((new_a, new_b)) = stack.pop() {
+            a = new_a;
+            b = new_b;
+        } else {
+            break;
+        }
+    }
+}
 
-// TODO: Use my bvh for space partitioning next
-
+// Sweep and Prune
 // The board phase is responsible for pruning the search space of possable collisions
 // I have tried different approaches, and I am sure I will try a few more
 // So far this simple approach has been the fastest
+#[allow(dead_code)]
 pub fn broadphase_system(
     mut broad_contacts: EventWriter<BroadContact>,
     query: Query<(Entity, &AabbWorld), With<RigidBodyMode>>,
@@ -17,7 +59,6 @@ pub fn broadphase_system(
     // TODO: Yes, we are copying the array out here, only way to sort it
     // Ideally we would keep the array around, it should already near sorted
     let mut list = query.iter().collect::<Vec<_>>();
-
 
     // Sort the array on currently selected sorting axis
     // Note: Update inter loop if you change the axis
@@ -60,7 +101,6 @@ pub fn broadphase_system(
         }
     }
 }
-
 
 #[allow(dead_code)]
 fn cmp_x_axis(a: &(Entity, &AabbWorld), b: &(Entity, &AabbWorld)) -> std::cmp::Ordering {

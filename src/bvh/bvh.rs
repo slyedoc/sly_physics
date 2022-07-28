@@ -41,6 +41,8 @@ impl BvhInstance {
     }
 
     pub fn update(&mut self, trans: &Transform, root: &BvhNode) {
+        
+
         // Update inv transfrom matrix for faster intersections
         let trans_matrix = trans.compute_matrix();
         self.inv_trans = trans_matrix.inverse();
@@ -69,21 +71,22 @@ pub struct Bvh {
 impl Bvh {
     // TODO: for now bvh get a copy of there down tris, this allows tlas to self contained
     // allowing for tlas intersection to used with any other resources, and no need for events
-    // PRO: This last part is the largest reason for keeping it like this, not needing to wait on a
-    // raycast makes using it alot more friendly
+    // This last part is the largest reason for keeping it like this, not needing to wait on a
+    // raycast event makes using it alot more friendly
     pub fn new(triangles: Vec<BvhTri>) -> Bvh {
         assert!(triangles.len() > 0);
         let count = triangles.len() as u32;
         let mut bvh = Bvh {
             tris: triangles,
             nodes: {
-                // Add root node and empty node to offset 1
+                // Add root node
                 let mut nodes = Vec::with_capacity(64);
                 nodes.push(BvhNode {
                     left_first: 0,
                     tri_count: count,
                     aabb: Aabb::default(),
                 });
+                // add empty node to offset reset of the vec by 1, so left 
                 nodes.push(BvhNode {
                     left_first: 0,
                     tri_count: 0,

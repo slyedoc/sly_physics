@@ -55,7 +55,7 @@ pub enum StackMode {
 impl Default for Stack {
     fn default() -> Self {
         Self {
-            count: (5u32,5u32,5u32),
+            count: (1u32,5u32,1u32),
             spacing: 1.0,
             time_scale: 1.0,
             mode: StackMode::Cube,

@@ -1,9 +1,12 @@
-use std::{ops::{Add, AddAssign}, cmp::Ordering};
+use std::{
+    cmp::Ordering,
+    ops::{Add, AddAssign},
+};
 
-use bevy::prelude::*;
+use bevy::{prelude::*, render::mesh::{Indices, PrimitiveTopology}};
 use bevy_inspector_egui::Inspectable;
 
-use crate::{MAX_ANGULAR_SPEED_SQ, MAX_ANGULAR_SPEED};
+use crate::{MAX_ANGULAR_SPEED, MAX_ANGULAR_SPEED_SQ};
 
 #[derive(Debug)]
 pub struct BroadContact {
@@ -26,42 +29,34 @@ pub struct Contact {
 
 impl Contact {
     pub fn correct(&mut self) {
-
         // edit contacts so A < B, makes manifold lookups easier
-    
+
         if self.a.partial_cmp(&self.b) == Some(Ordering::Greater) {
             std::mem::swap(&mut self.local_point_a, &mut self.local_point_b);
             std::mem::swap(&mut self.world_point_a, &mut self.world_point_b);
             std::mem::swap(&mut self.a, &mut self.b);
         }
-        
     }
 }
 #[derive(Component, Inspectable, Debug)]
 pub struct RBHelper;
 
 impl RBHelper {
-    pub fn world_to_local(
-        trans: &Transform,
-        com: &CenterOfMass,
-        world_point: Vec3,
-
-    ) -> Vec3 {
+    pub fn world_to_local(trans: &Transform, com: &CenterOfMass, world_point: Vec3) -> Vec3 {
         let com_world = trans.translation + trans.rotation * com.0;
         let inv_orientation = trans.rotation.conjugate();
         inv_orientation * (world_point - com_world)
     }
 
-    pub fn local_to_world(
-        trans: &Transform,
-        com: &CenterOfMass,
-        local_point: Vec3,
-    ) -> Vec3 {
+    pub fn local_to_world(trans: &Transform, com: &CenterOfMass, local_point: Vec3) -> Vec3 {
         let com_world = trans.translation + trans.rotation * com.0;
         com_world + trans.rotation * local_point
     }
 
-    pub fn inv_intertia_tensor_world(trans: &Transform, inv_inertia_tensor: &InverseInertiaTensor) -> Mat3 {
+    pub fn inv_intertia_tensor_world(
+        trans: &Transform,
+        inv_inertia_tensor: &InverseInertiaTensor,
+    ) -> Mat3 {
         let orientation = Mat3::from_quat(trans.rotation);
         orientation * inv_inertia_tensor.0 * orientation.transpose()
     }
@@ -119,9 +114,10 @@ impl RBHelper {
         // L = I w = r x p
         // dL = I dw = r x J
         // => dw = I^-1 * (r x J)
-        angular_velocity.0 += RBHelper::inv_intertia_tensor_world(trans, inv_inertia_tensor ) * impulse;
+        angular_velocity.0 +=
+            RBHelper::inv_intertia_tensor_world(trans, inv_inertia_tensor) * impulse;
 
-        // clamp angular_velocity 
+        // clamp angular_velocity
         if angular_velocity.0.length_squared() > MAX_ANGULAR_SPEED_SQ {
             angular_velocity.0 = angular_velocity.0.normalize() * MAX_ANGULAR_SPEED;
         }
@@ -152,7 +148,7 @@ impl RBHelper {
                 .0
                 .cross(inertia_tensor * angular_velocity.0));
         angular_velocity.0 += alpha * dt;
-        
+
         // update orientation
         let d_angle = angular_velocity.0 * dt;
         let angle = d_angle.length();
@@ -253,6 +249,38 @@ impl Default for Aabb {
     }
 }
 
+
+impl From<&Aabb> for Mesh {
+    fn from(aabb: &Aabb) -> Self {
+        let verts = vec![
+            [aabb.maxs.x, aabb.maxs.y, aabb.mins.z],
+            [aabb.mins.x, aabb.maxs.y, aabb.mins.z],
+            [aabb.mins.x, aabb.maxs.y, aabb.maxs.z],
+            [aabb.maxs.x, aabb.maxs.y, aabb.maxs.z],
+            [aabb.maxs.x, aabb.mins.y, aabb.mins.z],
+            [aabb.mins.x, aabb.mins.y, aabb.mins.z],
+            [aabb.mins.x, aabb.mins.y, aabb.maxs.z],
+            [aabb.maxs.x, aabb.mins.y, aabb.maxs.z],
+        ];
+
+        let uvs = vec![[0.0, 0.0]; 8];
+        let normals = vec![[0.0, 0.0, 1.0]; 8];
+
+        let indices = Indices::U32(vec![
+            0, 1, 1, 2, 2, 3, 3, 0, // Top ring
+            4, 5, 5, 6, 6, 7, 7, 4, // Bottom ring
+            0, 4, 1, 5, 2, 6, 3, 7, // Verticals
+        ]);
+
+        let mut mesh = Mesh::new(PrimitiveTopology::LineList);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verts);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+        mesh.set_indices(Some(indices));
+        mesh
+    }
+}
+
 impl Add<Vec3> for Aabb {
     type Output = Self;
     fn add(self, pt: Vec3) -> Self::Output {
@@ -271,6 +299,24 @@ impl AddAssign<Vec3> for Aabb {
 }
 
 impl Aabb {
+    pub fn intersection(&self, b: &Aabb) -> bool {
+        // Exit with no intersection if separated along an axis
+        if self.maxs[0] < b.mins[0] || self.mins[0] > b.maxs[0] {
+            return false;
+        }
+        if self.maxs[1] < b.mins[1] || self.mins[1] > b.maxs[1] {
+            return false;
+        }
+        if self.maxs[2] < b.mins[2] || self.mins[2] > b.maxs[2] {
+            return false;
+        }
+        // Overlapping on all axes means AABBs are intersecting
+        true
+    }
+
+    pub fn clear(&mut self) {
+        *self = Aabb::default();
+    }
 
     // TODO: preformance test form_points vs grow vs add_assign vs expand_by_point, all doing same thing
     pub fn from_points(pts: &[Vec3]) -> Self {
@@ -313,7 +359,6 @@ impl Aabb {
         AabbWorld(aabb)
     }
 
-    
     pub fn expand_by_point(&mut self, rhs: Vec3) {
         self.mins = Vec3::select(rhs.cmplt(self.mins), rhs, self.mins);
         self.maxs = Vec3::select(rhs.cmpgt(self.maxs), rhs, self.maxs);
@@ -322,10 +367,7 @@ impl Aabb {
     pub fn width(&self) -> Vec3 {
         self.maxs - self.mins
     }
-
 }
 
 #[derive(Debug, Deref, DerefMut, Default, Component, Inspectable)]
 pub struct AabbWorld(pub Aabb);
-
-

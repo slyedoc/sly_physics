@@ -1,6 +1,4 @@
-use crate::{
-    tasks::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystems, Ray, Tlas,
-};
+use crate::{tasks::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystems, Ray, Tlas};
 use bevy::{
     math::vec3,
     prelude::*,
@@ -16,12 +14,23 @@ pub struct PhysicsBvhCameraPlugin;
 // Really should only be used to debug and profile bvh
 impl Plugin for PhysicsBvhCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(init_camera).add_system_to_stage(
+        app
+        .add_system_to_stage(
+            PhysicsFixedUpdate,
+            init_camera
+                .run_in_state(PhysicsDebugState::Running)
+                .after(PhysicsSystems::ResolvePhase),
+        )
+        .add_system_to_stage(
             PhysicsFixedUpdate,
             render_image
                 .run_in_state(PhysicsDebugState::Running)
                 .label(PhysicsSystems::Camera)
                 .after(PhysicsSystems::ResolvePhase),
+        )
+        .add_exit_system(
+            PhysicsDebugState::Running,
+            remove_ui
         );
     }
 }
@@ -112,7 +121,7 @@ struct BvhImage;
 
 pub fn init_camera(
     mut commands: Commands,
-    mut camera_query: Query<&mut BvhCamera>,
+    mut camera_query: Query<&mut BvhCamera, Added<BvhCamera>>,
     node_query: Query<&Node>,
     mut images: ResMut<Assets<Image>>,
 ) {
@@ -140,7 +149,6 @@ pub fn init_camera(
 
         if camera.ui_id.is_none() {
             let image_handle = camera.image.as_ref().unwrap().clone();
-
             let id = commands
                 .spawn_bundle(ImageBundle {
                     style: Style {
@@ -195,12 +203,7 @@ pub fn render_image(
                     let v = y as f32 / camera.height as f32;
                     // TODO: Revisit multiple samples later
                     // if samples > 0 {
-                    //     u += rng.gen::<f32>() / camera.width as f32;
-                    //     v += rng.gen::<f32>() / camera.height as f32;
-                    // }
-
-                    // TODO: flip v since image is upside down, figure out why
-                    let mut ray = camera.get_ray(u, 1.0 - v);
+                     let mut ray = camera.get_ray(u, 1.0 - v);
                     let color = if let Some(hit) = ray.intersect_tlas(&tlas) {
                         vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0
                     } else {
@@ -213,5 +216,18 @@ pub fn render_image(
                     pixels[offset + 3] = 255;
                 }
             });
+    }
+}
+
+
+fn remove_ui(
+    mut commands: Commands,
+    mut camera_query: Query<&mut BvhCamera>,
+) {
+    for mut camera in camera_query.iter_mut() {
+        if let Some(id) = camera.ui_id {
+            camera.ui_id = None;
+            commands.entity(id).despawn_recursive();
+        }
     }
 }

@@ -1,15 +1,23 @@
 use bevy::prelude::*;
 
-use crate::{ Bvh, BvhInstance, Aabb};
+use crate::{Aabb, Bvh, BvhInstance};
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct TlasNode {
     pub aabb: Aabb,
-    pub left_right: u32, // 2x16 bits    
+    pub left_right: u32, // 2x16 bits
     pub blas: u32,
 }
 
 impl TlasNode {
+    pub fn left(&self) -> usize {
+        (self.left_right & 0xffff) as usize
+    }
+
+    pub fn right(&self) -> usize {
+        (self.left_right >> 16) as usize
+    }
+
     pub fn is_leaf(&self) -> bool {
         self.left_right == 0
     }
@@ -17,7 +25,7 @@ impl TlasNode {
 
 #[derive(Debug)]
 pub struct Tlas {
-    pub tlas_nodes: Vec<TlasNode>,    
+    pub tlas_nodes: Vec<TlasNode>,
     pub blas: Vec<BvhInstance>,
     pub bvhs: Vec<Bvh>,
 }
@@ -33,7 +41,6 @@ impl Default for Tlas {
 }
 
 impl Tlas {
-  
     pub fn add_bvh(&mut self, bvh: Bvh) -> usize {
         self.bvhs.push(bvh);
         self.bvhs.len() - 1
@@ -48,11 +55,10 @@ impl Tlas {
         self.tlas_nodes.reserve(self.blas.len() + 1);
         // reserve root node
         self.tlas_nodes.push(TlasNode::default());
-        
 
         let mut node_index = vec![0u32; self.blas.len() + 1];
         let mut node_indices = self.blas.len() as i32;
-        
+
         // assign a TLASleaf node to each BLAS
         // and index
         for (i, b) in self.blas.iter().enumerate() {
@@ -100,10 +106,12 @@ impl Tlas {
         for b in 0..n {
             if b != a {
                 let bmax = self.tlas_nodes[list[a as usize] as usize]
-                    .aabb.maxs
+                    .aabb
+                    .maxs
                     .max(self.tlas_nodes[list[b as usize] as usize].aabb.maxs);
                 let bmin = self.tlas_nodes[list[a as usize] as usize]
-                    .aabb.mins
+                    .aabb
+                    .mins
                     .min(self.tlas_nodes[list[b as usize] as usize].aabb.mins);
                 let e = bmax - bmin;
                 let surface_area = e.x * e.y + e.y * e.z + e.z * e.x;
@@ -117,19 +125,20 @@ impl Tlas {
     }
 
     pub fn update_bvh_instances(&mut self, query: &Query<&Transform>) {
-        
         let mut remove_list = Vec::new();
         for instance in &mut self.blas {
             let bvh = &self.bvhs[instance.bvh_index];
             if let Ok(trans) = query.get(instance.entity) {
+                // todo: going reset the aabb, clear here so tlas is really rebuilt
+                instance.bounds.clear();
+
                 instance.update(trans, &bvh.nodes[0]);
             } else {
                 remove_list.push(instance.entity);
             }
         }
-        
+
         //remove any not found
-        self.blas.retain(|b| !remove_list.contains(&b.entity) )
-        
+        self.blas.retain(|b| !remove_list.contains(&b.entity))
     }
 }
