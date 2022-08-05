@@ -1,17 +1,16 @@
 #![allow(dead_code)]
 mod constraint_constant_velocity;
-mod constraint_distance;
 mod constraint_hinge_quat;
 mod constraint_motor;
 mod constraint_mover;
 mod constraint_orientation;
-mod constraint_penetration;
-mod manifold;
+pub mod contact_manifold;
+pub mod distance;
 
 use crate::{
     math::{MatMN, VecN},
-    AngularVelocity, CenterOfMass, Elasticity, Friction, InertiaTensor, InverseInertiaTensor,
-    InverseMass, LinearVelocity, PhysicsConfig, RBHelper, MAX_SOLVE_ITERS,
+    AngularVelocity, CenterOfMass, InverseInertiaTensor,
+    InverseMass, LinearVelocity, RBHelper
 };
 use bevy::prelude::*;
 
@@ -21,40 +20,8 @@ use bevy::prelude::*;
 // use constraint_motor::ConstraintMotor;
 // use constraint_mover::ConstraintMoverSimple;
 // use constraint_orientation::ConstraintOrientation;
-pub use constraint_penetration::*;
-pub use manifold::*;
+pub use contact_manifold::*;
 
-pub fn solve_contraints(
-    mut rb_query: Query<(
-        &mut Transform,
-        &mut LinearVelocity,
-        &mut AngularVelocity,
-        &InverseMass,
-        &Elasticity,
-        &Friction,
-        &CenterOfMass,
-        &InertiaTensor,
-        &InverseInertiaTensor,
-    )>,
-    mut manifold_arena: ResMut<ManifoldArena>,
-    config: Res<PhysicsConfig>,
-) {
-    // self.constraints.pre_solve(&mut self.bodies, delta_seconds);
-    for (&(a, b), manifold) in &mut manifold_arena.manifolds {
-        for constraint in manifold.constraints.iter_mut() {
-            constraint.pre_solve(&mut rb_query, a, b, config.time);
-        }
-    }
-
-    for _ in 0..MAX_SOLVE_ITERS {
-        //self.constraints.solve(&mut self.bodies);
-        for (&(a, b), manifold) in &mut manifold_arena.manifolds {
-            for constraint in manifold.constraints.iter_mut() {
-                constraint.solve(&mut rb_query, a, b);
-            }
-        }
-    }
-}
 
 pub fn cleanpup_contraints(
     mut manifold_arena: ResMut<ManifoldArena>,
@@ -111,11 +78,10 @@ pub fn cleanpup_contraints(
         .retain(|&(_a, _b), manifold| manifold.contacts.len() > 0)
 }
 
-
 pub struct Constraint;
 
 impl Constraint {
-    fn get_inverse_mass_matrix(
+    pub fn get_inverse_mass_matrix(
         // A
         trans_a: &Transform,
         inv_mass_a: &InverseMass,
@@ -157,7 +123,7 @@ impl Constraint {
         inv_mass_matrix
     }
 
-    fn get_velocities(
+    pub fn get_velocities(
         lin_vel_a: &LinearVelocity,
         ang_vel_a: &AngularVelocity,
         lin_vel_b: &LinearVelocity,
@@ -165,27 +131,26 @@ impl Constraint {
     ) -> VecN<12> {
         let mut q_dt = VecN::zero();
 
-        q_dt[0] = lin_vel_a.0.x;
-        q_dt[1] = lin_vel_a.0.y;
-        q_dt[2] = lin_vel_a.0.z;
+        q_dt[0] = lin_vel_a.x;
+        q_dt[1] = lin_vel_a.y;
+        q_dt[2] = lin_vel_a.z;
 
-        q_dt[3] = ang_vel_a.0.x;
-        q_dt[4] = ang_vel_a.0.y;
-        q_dt[5] = ang_vel_a.0.z;
+        q_dt[3] = ang_vel_a.x;
+        q_dt[4] = ang_vel_a.y;
+        q_dt[5] = ang_vel_a.z;
 
-        q_dt[6] = lin_vel_b.0.x;
-        q_dt[7] = lin_vel_b.0.y;
-        q_dt[8] = lin_vel_b.0.z;
+        q_dt[6] = lin_vel_b.x;
+        q_dt[7] = lin_vel_b.y;
+        q_dt[8] = lin_vel_b.z;
 
-        q_dt[9] = ang_vel_b.0.x;
-        q_dt[10] = ang_vel_b.0.y;
-        q_dt[11] = ang_vel_b.0.z;
+        q_dt[9] = ang_vel_b.x;
+        q_dt[10] = ang_vel_b.y;
+        q_dt[11] = ang_vel_b.z;
 
         q_dt
     }
 
-    fn apply_impulses(
-
+    pub fn apply_impulses(
         // A
         trans_a: &Transform,
         lin_vel_a: &mut LinearVelocity,
@@ -228,18 +193,6 @@ impl Constraint {
         }
     }
 }
-
-// pub struct ConstraintArena {
-//     penetration_constraints: Vec<ConstraintPenetration>,
-// }
-
-// impl Default for ConstraintArena {
-//     fn default() -> Self {
-//         ConstraintArena {
-//             penetration_constraints: Vec::new(),
-//         }
-//     }
-// }
 
 // impl ConstraintArena {
 //     pub fn clear(&mut self) {

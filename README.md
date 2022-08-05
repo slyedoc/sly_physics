@@ -11,21 +11,9 @@ This is where I am teaching myself what goes into a physiscs engine, the goal is
 
 I have playing with bevy for a while now and the only real option you have for physics is [Rapier](https://github.com/dimforge/rapier), either though [bevy_rapier](https://github.com/dimforge/bevy_rapier) or [heron](https://github.com/jcornaz/heron) or Physx. Physx is a no for wasm support and removing unsafe things.  While rapier is truly amazing, I wanted a bevy native experence using the ecs that I can understand and hack on in one repo.
 
-# Status
+# Status 
 
-
-
- - [x] Colliders
-   - [ ] Sphere
-   - [ ] Cu
- - [x] Phases
-   - [x] Broad - prune_and_sweep, working on bvh
-   - [x] Narrow
-     - [x] Continouns
-       - [x] Sphere vs Sphere
-       - [ ] Box, using gj
-       - [x] GJK
-      - [ ] 
+  
 ## Credit
 
 - [Game Physics in One Weekend](https://gamephysicsweekend.github.io/)
@@ -35,3 +23,8 @@ I have playing with bevy for a while now and the only real option you have for p
   - Bitshifter is the developer of the [glam](https://github.com/bitshifter/glam-rs) crate, finding that repo and knowing I can use it as ref gave me the confidence to even start this.
 - [bevy_rapier](https://github.com/dimforge/bevy_rapier)
 - [BVH tutorial series](https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/) by Jacco Bikker.   Go check it out if bvh's interest you. 
+
+## Notes
+
+Since a primary goal is preformance I am avoiding dynamic dispatching, if your new to the concept see 
+https://medium.com/digitalfrontiers/rust-dynamic-dispatching-deep-dive-236a5896e49b for a descent overview

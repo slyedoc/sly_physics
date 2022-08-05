@@ -1,6 +1,5 @@
 use std::{
-    cmp::Ordering,
-    ops::{Add, AddAssign},
+    ops::{Add, AddAssign}, cmp::Ordering,
 };
 
 use bevy::{prelude::*, render::mesh::{Indices, PrimitiveTopology}};
@@ -28,16 +27,20 @@ pub struct Contact {
 }
 
 impl Contact {
-    pub fn correct(&mut self) {
-        // edit contacts so A < B, makes manifold lookups easier
-
-        if self.a.partial_cmp(&self.b) == Some(Ordering::Greater) {
+    pub fn correct(&mut self, trans_a: &Transform, trans_b: &Transform) {
+    
+        // edit contacts so A < B, makes manifold lookups easier        
+        if trans_a.translation.x > trans_b.translation.x || 
+            (trans_a.translation.x == trans_b.translation.x && trans_a.translation.y > trans_b.translation.y) || 
+            (trans_a.translation.x == trans_b.translation.x && trans_a.translation.y == trans_b.translation.y && trans_a.translation.z > trans_b.translation.z) 
+        {
             std::mem::swap(&mut self.local_point_a, &mut self.local_point_b);
             std::mem::swap(&mut self.world_point_a, &mut self.world_point_b);
             std::mem::swap(&mut self.a, &mut self.b);
         }
     }
 }
+
 #[derive(Component, Inspectable, Debug)]
 pub struct RBHelper;
 
@@ -221,6 +224,21 @@ pub struct CenterOfMass(pub Vec3);
 #[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
 pub struct InertiaTensor(pub Mat3);
 
+#[derive(Component, Inspectable, Debug)]
+pub struct Damping {
+    pub linear: f32,
+    pub angular: f32,
+}
+
+impl Default for Damping {
+    fn default() -> Damping {
+        Damping {
+            linear: 0.01,
+            angular: 0.01,
+        }
+    }
+}
+
 #[derive(Component, Inspectable, Debug, Default)]
 pub struct InverseInertiaTensor(pub Mat3);
 
@@ -230,9 +248,6 @@ pub struct CenterOfMassWorld(pub Vec3);
 #[derive(Debug, Default)]
 pub struct InverseInertiaTensorWorld(pub Mat3);
 
-// TODO: Not really happy with this, should I be using an handle and asset?
-#[derive(Debug, Component, Inspectable, Default)]
-pub struct GJKVerts(pub Vec<Vec3>);
 
 #[derive(Debug, Component, Inspectable, Copy, Clone)]
 pub struct Aabb {

@@ -2,7 +2,7 @@ use bevy::{
     diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
     prelude::*,
 };
-use iyes_loopless::state::*;
+use iyes_loopless::prelude::*;
 use sly_physics::prelude::*;
 
 use super::Keep;
@@ -31,7 +31,8 @@ struct PhysicsStateText;
 #[derive(Component)]
 struct DebugStateText;
 
-const UI_SIZE: f32 = 30.0;
+pub const UI_SIZE: f32 = 30.0;
+
 fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
     let ui_font = asset_server.load("fonts/FiraSans-Bold.ttf");
 
@@ -42,7 +43,7 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
         .spawn_bundle(TextBundle {
             style: Style {
                 position_type: PositionType::Absolute,
-                position: Rect::<Val> {
+                position: UiRect::<Val> {
                     left: Val::Px(10.0),
                     bottom: Val::Px(offset),
                     ..Default::default()
@@ -86,7 +87,7 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
         .spawn_bundle(TextBundle {
             style: Style {
                 position_type: PositionType::Absolute,
-                position: Rect::<Val> {
+                position: UiRect::<Val> {
                     left: Val::Px(10.0),
                     bottom: Val::Px(offset),
                     ..Default::default()
@@ -130,7 +131,7 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
         .spawn_bundle(TextBundle {
             style: Style {
                 position_type: PositionType::Absolute,
-                position: Rect::<Val> {
+                position: UiRect::<Val> {
                     left: Val::Px(10.0),
                     bottom: Val::Px(offset),
                     ..Default::default()

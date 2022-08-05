@@ -1,4 +1,6 @@
-use bevy::prelude::*;
+use std::f32::consts::FRAC_PI_2;
+
+use bevy::{prelude::*, math::vec3};
 use iyes_loopless::prelude::*;
 use sly_camera_controller::CameraController;
 use sly_physics::prelude::*;
@@ -12,7 +14,7 @@ impl Plugin for HelperPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(AppState::Playing)
             .add_plugin(OverlayPlugin)
-            .add_system(reset_listen.run_in_state(AppState::Playing))
+            .add_system_to_stage( CoreStage::Update, reset_listen.run_in_state(AppState::Playing))
             .add_enter_system(AppState::Reset, reset)
             .add_system(toggle_physics)
             .add_system(toggle_physics_debug);
@@ -35,12 +37,12 @@ pub fn setup_camera(mut commands: Commands) {
         .insert(Keep);
 
     // cameras
+    // commands
+    //     .spawn_bundle(Camera2dBundle::default())
+    //     .insert(Keep);
+        
     commands
-        .spawn_bundle(UiCameraBundle::default())
-        .insert(Keep);
-
-    commands
-        .spawn_bundle(PerspectiveCameraBundle {
+        .spawn_bundle(Camera3dBundle {
             transform: Transform::from_xyz(0.0, 2.0, -30.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         })
@@ -50,6 +52,61 @@ pub fn setup_camera(mut commands: Commands) {
         .insert(Keep);
 }
 
+
+pub fn setup_room(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut collider_resources: ResMut<ColliderResources>,
+) {
+    let floor_size = 100.0;
+    let wall_height = 10.0;
+    let floor_half = floor_size * 0.5;
+    let wall_height_half = wall_height * 0.5;
+    // floor
+    commands
+        .spawn_bundle(PbrBundle {
+            transform: Transform::from_xyz(0.0, -0.5, 0.0),
+            mesh: meshes.add(Mesh::from(shape::Box::new(floor_size, 1.0, floor_size))),
+            material: materials.add(StandardMaterial {
+                base_color: Color::DARK_GREEN,
+                ..default()
+            }),
+            ..default()
+        })
+        .insert_bundle(RigidBodyBundle {
+            collider: collider_resources.add_box(vec3(floor_size, 1.0, floor_size)),
+            mode: RigidBodyMode::Static,
+            ..default()
+        })
+        .insert(Name::new("Floor"));
+
+    // walls
+    for wall in 0..4 {
+        let mut transform = Transform::from_xyz(0.0, wall_height_half, floor_half);
+        transform.rotate_around(
+            Vec3::ZERO,
+            Quat::from_axis_angle(Vec3::Y, wall as f32 * FRAC_PI_2),
+        );
+
+        commands
+            .spawn_bundle(PbrBundle {
+                transform,
+                mesh: meshes.add(Mesh::from(shape::Box::new(floor_size, wall_height, 1.0))),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::ALICE_BLUE,
+                    ..default()
+                }),
+                ..default()
+            })
+            .insert_bundle(RigidBodyBundle {
+                collider: collider_resources.add_box(vec3(floor_size, wall_height, 1.0)),
+                mode: RigidBodyMode::Static,
+                ..default()
+            })
+            .insert(Name::new("Wall"));
+    }
+}
 
 fn toggle_physics(
     mut commands: Commands,

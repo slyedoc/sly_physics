@@ -1,10 +1,8 @@
 mod bvh_camera;
 pub use bvh_camera::*;
 
-use crate::{bvh::Tlas, AabbWorld, PhysicsFixedUpdate, PhysicsState};
-use bevy::{
-    prelude::*,
-};
+use crate::{bvh::Tlas, prelude::ManifoldArena, AabbWorld, PhysicsFixedUpdate, PhysicsState};
+use bevy::prelude::*;
 use iyes_loopless::prelude::*;
 
 #[derive(Component)]
@@ -25,10 +23,14 @@ pub struct AabbDebug(pub Entity);
 #[derive(Component)]
 pub struct AabbWorldDebug(pub Entity);
 
+#[derive(Component)]
+pub struct DebugContactMaterial(Handle<StandardMaterial>);
+
 pub struct PhysicsDebugPlugin;
 impl Plugin for PhysicsDebugPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(PhysicsDebugState::Paused)
+            .add_startup_system(setup)
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
@@ -43,13 +45,23 @@ impl Plugin for PhysicsDebugPlugin {
                     .run_in_state(PhysicsDebugState::Running)
                     .with_system(spawn_debug)
                     .with_system(spawn_bvh_debug)
+                    .with_system(spawn_contacts)
                     .into(),
             )
             .add_enter_system(PhysicsDebugState::Paused, remove_debug);
     }
 }
 
-pub fn spawn_debug(
+fn setup(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
+    commands.insert_resource::<DebugContactMaterial>(DebugContactMaterial(
+        materials.add(StandardMaterial {
+            base_color: Color::rgb(0.5, 0.5, 0.5),
+            ..default()
+        }),
+    ));
+}
+
+fn spawn_debug(
     mut commands: Commands,
     query: Query<(Entity, &AabbWorld, &Transform), Without<AabbWorldDebug>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -131,3 +143,37 @@ fn spawn_bvh_debug(
     }
 }
 
+#[derive(Component)]
+struct ContactDebug;
+
+fn spawn_contacts(
+    mut commands: Commands,
+    query: Query<Entity, With<ContactDebug>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    debug_contact_material: Res<DebugContactMaterial>,
+    mut contact_manifold: Res<ManifoldArena>,
+) {
+    //remove old
+    for e in query.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+
+    //add contact
+    for ((_e1, _e2), manifold) in &contact_manifold.manifolds {    
+            commands
+                .spawn_bundle(PbrBundle {
+                    transform: Transform::from_translation(manifold.contacts[0].world_point_a),
+                    mesh: meshes.add(Mesh::from(shape::UVSphere {
+                        radius: 0.1,
+                        ..default()
+                    })),
+                    material: debug_contact_material.0.clone(),
+                    visibility: Visibility { is_visible: true },
+                    ..Default::default()
+                })
+                .insert(ContactDebug)
+                .insert(PhysicsDebug)
+                .insert(Name::new("Contact Debug"));
+        
+    }
+}

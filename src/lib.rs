@@ -3,6 +3,7 @@ mod colliders;
 mod constraints;
 mod debug;
 
+mod damping;
 mod intersect;
 mod math;
 mod phases;
@@ -12,9 +13,10 @@ mod types;
 
 use bevy::{math::vec3, prelude::*};
 use bevy_inspector_egui::prelude::*;
-use constraints::{cleanpup_contraints, solve_contraints, ManifoldArena};
+use constraints::{cleanpup_contraints, ManifoldArena};
 use iyes_loopless::prelude::*;
-use phases::{narrow_system, resolve_system, broadphase_system};
+use phases::{broadphase_system, narrow_system, resolve_system};
+use damping::damping_system;
 
 use bvh::*;
 use colliders::*;
@@ -24,7 +26,7 @@ use types::*;
 pub const PHYSISCS_TIMESTEP: f64 = 1.0 / 60.0;
 
 const MAX_MANIFOLD_CONTACTS: usize = 4;
-const MAX_SOLVE_ITERS: u32 = 5;
+const MAX_SOLVE_ITERS: u32 = 5; // TODO: will need to update systems if you change this currently
 
 const BVH_BIN_COUNT: usize = 8;
 
@@ -38,13 +40,12 @@ const EPSILON_SQ: f32 = EPSILON * EPSILON;
 
 pub mod prelude {
     pub use crate::{
-        colliders::Collider, constraints::ManifoldArena, debug::BvhCamera,
+        bvh::Tlas, colliders::Collider, colliders::ColliderResources, constraints::ManifoldArena, debug::BvhCamera,
         debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState,
-        ray::Ray, bvh::Tlas, types::AngularVelocity, types::CenterOfMass, types::Elasticity,
-        types::Friction, types::InertiaTensor, types::LinearVelocity, types::Mass,
-        types::RigidBodyMode, PhysicsConfig, PhysicsPlugin, PhysicsState, PhysicsSystems,
-        RigidBodyBundle, PHYSISCS_TIMESTEP,
-        PhysicsFixedUpdate,
+        ray::Ray, types::AngularVelocity, types::CenterOfMass, types::Elasticity, types::Friction,
+        types::InertiaTensor, types::LinearVelocity, types::Mass, types::RigidBodyMode,
+        PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState, PhysicsSystems,
+        RigidBodyBundle, PHYSISCS_TIMESTEP, 
     };
 }
 
@@ -59,8 +60,10 @@ pub struct RigidBodyBundle {
     pub friction: Friction,
     pub center_of_mass: CenterOfMass,
     pub inertia_tensor: InertiaTensor,
+    pub damping: Damping,
+
     // Will be added
-    // Option<Static>, need to test removing and using filter on mode vs new component
+    // Static - if mode is static static
     // Aabb,
     // AabbWorld,
     // InverseMass,
@@ -95,7 +98,14 @@ pub enum PhysicsSystems {
     DynamicPhase,
     BroadPhase,
     NarrowPhase,
-    SolvePhase,
+    ConstraintPreSolvePhase,
+    ConstraintSolve0,
+    ConstraintSolve1,
+    ConstraintSolve2,
+    ConstraintSolve3,
+    ConstraintSolve4,
+    ConstraintPostSolve,
+    Damping,
     ResolvePhase,
     Camera,
 }
@@ -116,6 +126,7 @@ impl Plugin for PhysicsPlugin {
             .add_event::<BroadContact>()
             .add_event::<Contact>()
             .init_resource::<PhysicsConfig>()
+            .init_resource::<ColliderResources>()
             .init_resource::<ManifoldArena>()
             .init_resource::<Tlas>()
             .add_stage_after(
@@ -178,43 +189,94 @@ impl Plugin for PhysicsPlugin {
                     .with_system(narrow_system)
                     .into(),
             )
+            // Contraints
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::SolvePhase)
+                    .label(PhysicsSystems::ConstraintPreSolvePhase)
                     .after(PhysicsSystems::NarrowPhase)
-                    .with_system(solve_contraints)
+                    .with_system(constraints::contact_manifold::pre_solve)
+                    .with_system(constraints::distance::pre_solve)
                     .into(),
-            )
-            .add_system_set_to_stage(
+            );
+            // TODO: find better way to reuse systems
+        for i in 0..MAX_SOLVE_ITERS {
+            app.add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::ResolvePhase)
-                    .after(PhysicsSystems::SolvePhase)
-                    .with_system(resolve_system)
+                    .label(match i {
+                        0 => PhysicsSystems::ConstraintSolve0,
+                        1 => PhysicsSystems::ConstraintSolve1,
+                        2 => PhysicsSystems::ConstraintSolve2,
+                        3 => PhysicsSystems::ConstraintSolve3,
+                        4 => PhysicsSystems::ConstraintSolve4,
+                        _ => unreachable!(),
+                    })
+                    .after(match i {
+                        0 => PhysicsSystems::ConstraintPreSolvePhase,
+                        1 => PhysicsSystems::ConstraintSolve0,
+                        2 => PhysicsSystems::ConstraintSolve1,
+                        3 => PhysicsSystems::ConstraintSolve2,
+                        4 => PhysicsSystems::ConstraintSolve3,
+                        _ => unreachable!(),
+                    })
+                    .with_system(constraints::contact_manifold::solve)
+                    .with_system(constraints::distance::solve)
                     .into(),
-            )
-            .register_inspectable::<LinearVelocity>()
-            .register_inspectable::<Static>()
-            .register_inspectable::<AngularVelocity>()
-            .register_inspectable::<Elasticity>()
-            .register_inspectable::<Friction>()
-            .register_inspectable::<Mass>()
-            .register_inspectable::<InverseMass>()
-            .register_inspectable::<CenterOfMass>()
-            .register_inspectable::<InertiaTensor>()
-            .register_inspectable::<InverseInertiaTensor>()
-            .register_inspectable::<Collider>()
-            .register_inspectable::<Aabb>()
-            .register_inspectable::<AabbWorld>()
-            //.register_inspectable::<Bvh>()
-            //.register_inspectable::<debug::BvhCamera>()
-            // .register_inspectable::<Tlas>()
-            // .register_inspectable::<TlasNode>()
-            // .register_inspectable::<Tri>()
-            .register_inspectable::<Aabb>();
+            );
+        }
+        app.add_system_set_to_stage(
+            PhysicsFixedUpdate,
+            ConditionSet::new()
+                .run_in_state(PhysicsState::Running)
+                .label(PhysicsSystems::ConstraintPostSolve)
+                .after(PhysicsSystems::ConstraintSolve4)
+                .with_system(constraints::distance::post_solve)
+                .into(),
+        )
+        // .add_system_set_to_stage(
+        //     PhysicsFixedUpdate,
+        //     ConditionSet::new()
+        //         .run_in_state(PhysicsState::Running)
+        //         .label(PhysicsSystems::Damping)
+        //         .after(PhysicsSystems::ConstraintPostSolve)
+        //         .with_system(damping_system)
+        //         .into(),
+        // )
+        .add_system_set_to_stage(
+            PhysicsFixedUpdate,
+            ConditionSet::new()
+                .run_in_state(PhysicsState::Running)
+                .label(PhysicsSystems::ResolvePhase)
+                .after(PhysicsSystems::ConstraintPostSolve)
+                .with_system(resolve_system)
+                .into(),
+        )
+        .register_inspectable::<LinearVelocity>()
+        .register_inspectable::<Static>()
+        .register_inspectable::<AngularVelocity>()
+        .register_inspectable::<Elasticity>()
+        .register_inspectable::<Friction>()
+        .register_inspectable::<Mass>()
+        .register_inspectable::<InverseMass>()
+        .register_inspectable::<CenterOfMass>()
+        .register_inspectable::<InertiaTensor>()
+        .register_inspectable::<InverseInertiaTensor>()
+        .register_inspectable::<Collider>()
+        .register_inspectable::<Aabb>()
+        .register_inspectable::<AabbWorld>()
+        //.register_inspectable::<Bvh>()
+        //.register_inspectable::<debug::BvhCamera>()
+        // .register_inspectable::<Tlas>()
+        // .register_inspectable::<TlasNode>()
+        // .register_inspectable::<Tri>()
+        .register_inspectable::<Aabb>();
+    }
+
+    fn name(&self) -> &str {
+        std::any::type_name::<Self>()
     }
 }
 
@@ -233,6 +295,8 @@ pub fn spawn(
         (Added<Collider>, With<Transform>),
     >,
     mut tlas: ResMut<Tlas>,
+    collider_resources: Res<ColliderResources>,    
+
 ) {
     for (e, collider, rb_mode, mut mass, mut center_of_mass, mut inertia_tensor) in query.iter_mut()
     {
@@ -257,38 +321,47 @@ pub fn spawn(
         commands.entity(e).insert(InverseMass(inv_mass));
 
         match collider {
-            Collider::Sphere { radius: _ } | Collider::Cuboid { size: _ } => {
-                center_of_mass.0 = collider.get_center_of_mass();
-
-                let tensor = collider.get_inertia_tensor();
+            Collider::Sphere(index) => {
+                let sphere = collider_resources.get_sphere(*index);
+                center_of_mass.0 = sphere.get_center_of_mass();
+                let tensor = sphere.get_inertia_tensor();
                 inertia_tensor.0 = tensor;
 
                 commands
                     .entity(e)
-                    .insert(collider.get_aabb())
+                    .insert(sphere.get_aabb())
                     .insert(AabbWorld::default())
-                    .insert(InverseInertiaTensor(tensor.inverse() * inv_mass))
-                    .insert(GJKVerts(collider.get_gjk_verts()));
+                    .insert(InverseInertiaTensor(tensor.inverse() * inv_mass));
 
-                // TODO: Add bvh
-                let bvh_mesh = match collider {
-                    Collider::Sphere { radius: r } => Mesh::from(shape::UVSphere {
-                        radius: *r,
+                let bvh_mesh = Mesh::from(shape::UVSphere {
+                        radius: sphere.radius,
                         sectors: 6,
                         stacks: 6,
-                    }),
-                    Collider::Cuboid { size } => {
-                        Mesh::from(shape::Box::new(size.x, size.y, size.z))
-                    }
-                    Collider::ConvexHull => unreachable!(),
-                };
+                });
 
                 let bvh_tri = parse_bvh_mesh(&bvh_mesh);
                 //info!("e: {:?} bvh_tri: {:?}", e, bvh_tri);
                 let bvh_index = tlas.add_bvh(Bvh::new(bvh_tri));
                 tlas.add_instance(BvhInstance::new(e, bvh_index));
-            }
-            Collider::ConvexHull => {
+            },
+            Collider::Box(index) => {
+                let b = collider_resources.get_box(*index);
+                center_of_mass.0 = b.get_center_of_mass();
+                let tensor = b.get_inertia_tensor();
+                inertia_tensor.0 = tensor;
+
+                commands
+                    .entity(e)
+                    .insert(b.get_aabb())
+                    .insert(AabbWorld::default())
+                    .insert(InverseInertiaTensor(tensor.inverse() * inv_mass));
+                
+                let bvh_mesh = Mesh::from(shape::Box::new(b.size.x, b.size.y, b.size.z));
+                let bvh_tri = parse_bvh_mesh(&bvh_mesh);
+                let bvh_index = tlas.add_bvh(Bvh::new(bvh_tri));
+                tlas.add_instance(BvhInstance::new(e, bvh_index));
+            },
+            Collider::Convex(_index) => {
                 commands.entity(e).insert(InitConvex);
             }
         }
@@ -387,7 +460,7 @@ pub fn update_world_info(mut query: Query<(&Transform, &Aabb, &mut AabbWorld)>) 
 
 // TODO: both of these update system are incomplete, for now we are rebuilding every frame
 fn update_bvh(query: Query<&Transform>, mut tlas: ResMut<Tlas>) {
-    tlas.update_bvh_instances(&query);    
+    tlas.update_bvh_instances(&query);
     tlas.build();
 }
 

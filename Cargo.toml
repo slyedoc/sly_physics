@@ -16,21 +16,20 @@ opt-level = 1
 opt-level = 3
 
 [features]
-default = []
-static = []
+default = ["continuous"]
+discrete = []
+continuous = []
 trace = ["bevy/trace", "bevy/trace_chrome"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy =  { version = "0.7.0" }
-bevy-inspector-egui = { version = "0.11.0" }
-iyes_loopless = { git = "https://github.com/NiklasEi/iyes_loopless", branch = "loopless-schedule-ext-trait" }
-
-#glam = { version = "0.20.0", features = ["serde", "glam-assert"] }
+bevy =  { version = "0.8.0" }
+bevy-inspector-egui = { version = "0.12.1" }
+iyes_loopless = { version = "0.7.0" }
 
 [dev-dependencies]
-bevy-inspector-egui = "0.11.0"
+bevy-inspector-egui = "0.12.1"
 sly_camera_controller = { git = "https://github.com/slyedoc/sly_camera_controller", branch = "main" }
 
 [[example]]
