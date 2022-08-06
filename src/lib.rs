@@ -150,17 +150,8 @@ impl Plugin for PhysicsPlugin {
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::Update)
-                    .after(PhysicsSystems::SetupConvex)
-                    .with_system(update_world_info)
-                    .into(),
-            )
-            .add_system_set_to_stage(
-                PhysicsFixedUpdate,
-                ConditionSet::new()
-                    .run_in_state(PhysicsState::Running)
                     .label(PhysicsSystems::UpdateBvh)
-                    .after(PhysicsSystems::Update)
+                    .after(PhysicsSystems::SetupConvex)
                     .with_system(update_bvh)
                     .into(),
             )
@@ -249,6 +240,15 @@ impl Plugin for PhysicsPlugin {
                 .label(PhysicsSystems::Resolve)
                 .after(PhysicsSystems::ConstraintPostSolve)
                 .with_system(resolve_system)
+                .into(),
+        )
+        .add_system_set_to_stage(
+            PhysicsFixedUpdate,
+            ConditionSet::new()
+                .run_in_state(PhysicsState::Running)
+                .label(PhysicsSystems::Update)
+                .after(PhysicsSystems::Resolve)
+                .with_system(update_world_info)
                 .into(),
         );
         #[cfg(feature = "step")]

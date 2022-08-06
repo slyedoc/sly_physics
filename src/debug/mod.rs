@@ -1,7 +1,7 @@
 mod bvh_camera;
 pub use bvh_camera::*;
 
-use crate::{bvh::Tlas, prelude::PenetrationArena, AabbWorld, PhysicsFixedUpdate, PhysicsState};
+use crate::{bvh::Tlas, prelude::PenetrationArena, AabbWorld, PhysicsFixedUpdate, PhysicsState, PhysicsSystems};
 use bevy::prelude::*;
 use iyes_loopless::prelude::*;
 
@@ -36,6 +36,7 @@ impl Plugin for PhysicsDebugPlugin {
                 ConditionSet::new()
                     .run_in_state(PhysicsDebugState::Running)
                     .run_in_state(PhysicsState::Running)
+                    .after(PhysicsSystems::Update)
                     .with_system(update_debug)
                     .into(),
             )
@@ -43,6 +44,8 @@ impl Plugin for PhysicsDebugPlugin {
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsDebugState::Running)
+                    .run_in_state(PhysicsState::Running)
+                    .after(PhysicsSystems::Update)
                     .with_system(spawn_debug)
                     .with_system(spawn_bvh_debug)
                     .with_system(spawn_contacts)

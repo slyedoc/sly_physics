@@ -113,7 +113,7 @@ fn toggle_physics(
     input: Res<Input<KeyCode>>,
     state: Res<CurrentState<PhysicsState>>,
 ) {
-    if input.just_pressed(KeyCode::Space) {
+    if input.pressed(KeyCode::Space) {
         let target = match state.0 {            
             PhysicsState::Running => PhysicsState::Paused,
             PhysicsState::Paused => PhysicsState::Running,
