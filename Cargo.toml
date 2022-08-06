@@ -16,7 +16,7 @@ opt-level = 1
 opt-level = 3
 
 [features]
-default = ["continuous"]
+default = ["continuous", "step"]
 discrete = []
 continuous = []
 step = []

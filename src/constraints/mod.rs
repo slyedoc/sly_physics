@@ -9,7 +9,7 @@ pub mod distance;
 
 use crate::{
     math::{MatMN, VecN},
-    AngularVelocity, CenterOfMass, InverseInertiaTensor,
+    AngularVelocity, InverseInertiaTensor,
     InverseMass, LinearVelocity, RBHelper
 };
 use bevy::prelude::*;

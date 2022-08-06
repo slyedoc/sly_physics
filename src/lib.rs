@@ -107,6 +107,7 @@ pub enum PhysicsSystems {
     Damping,
     Resolve,
     Camera,
+    Step,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, StageLabel)]
@@ -196,42 +197,32 @@ impl Plugin for PhysicsPlugin {
             );
 
         // TODO: find better way to reuse systems
-        // for i in 0..MAX_SOLVE_ITERS {
-        //     app.add_system_set_to_stage(
-        //         PhysicsFixedUpdate,
-        //         ConditionSet::new()
-        //             .run_in_state(PhysicsState::Running)
-        //             .label(match i {
-        //                 0 => PhysicsSystems::ConstraintSolve0,
-        //                 1 => PhysicsSystems::ConstraintSolve1,
-        //                 2 => PhysicsSystems::ConstraintSolve2,
-        //                 3 => PhysicsSystems::ConstraintSolve3,
-        //                 4 => PhysicsSystems::ConstraintSolve4,
-        //                 _ => unreachable!(),
-        //             })
-        //             .after(match i {
-        //                 0 => PhysicsSystems::ConstraintPreSolve,
-        //                 1 => PhysicsSystems::ConstraintSolve0,
-        //                 2 => PhysicsSystems::ConstraintSolve1,
-        //                 3 => PhysicsSystems::ConstraintSolve2,
-        //                 4 => PhysicsSystems::ConstraintSolve3,
-        //                 _ => unreachable!(),
-        //             })
-        //             .with_system(constraints::penetration_manifold::solve)
-        //             .with_system(constraints::distance::solve)
-        //             .into(),
-        //     );
-        // }
-        app.add_system_set_to_stage(
-            PhysicsFixedUpdate,
-            ConditionSet::new()
-                .run_in_state(PhysicsState::Running)
-                .label(PhysicsSystems::ConstraintSolve0)
-                .after(PhysicsSystems::ConstraintPreSolve)
-                .with_system(constraints::penetration_manifold::solve)
-                .with_system(constraints::distance::solve)
-                .into(),
-        );
+        for i in 0..MAX_SOLVE_ITERS {
+            app.add_system_set_to_stage(
+                PhysicsFixedUpdate,
+                ConditionSet::new()
+                    .run_in_state(PhysicsState::Running)
+                    .label(match i {
+                        0 => PhysicsSystems::ConstraintSolve0,
+                        1 => PhysicsSystems::ConstraintSolve1,
+                        2 => PhysicsSystems::ConstraintSolve2,
+                        3 => PhysicsSystems::ConstraintSolve3,
+                        4 => PhysicsSystems::ConstraintSolve4,
+                        _ => unreachable!(),
+                    })
+                    .after(match i {
+                        0 => PhysicsSystems::ConstraintPreSolve,
+                        1 => PhysicsSystems::ConstraintSolve0,
+                        2 => PhysicsSystems::ConstraintSolve1,
+                        3 => PhysicsSystems::ConstraintSolve2,
+                        4 => PhysicsSystems::ConstraintSolve3,
+                        _ => unreachable!(),
+                    })
+                    .with_system(constraints::penetration_manifold::solve)
+                    .with_system(constraints::distance::solve)
+                    .into(),
+            );
+        }     
         app.add_system_set_to_stage(
             PhysicsFixedUpdate,
             ConditionSet::new()
@@ -259,8 +250,19 @@ impl Plugin for PhysicsPlugin {
                 .after(PhysicsSystems::ConstraintPostSolve)
                 .with_system(resolve_system)
                 .into(),
-        )
-        .register_inspectable::<LinearVelocity>()
+        );
+        #[cfg(feature = "step")]
+        app.add_system_set_to_stage(
+            PhysicsFixedUpdate,
+            ConditionSet::new()
+                .run_in_state(PhysicsState::Running)
+                .label(PhysicsSystems::Step)
+                .after(PhysicsSystems::Resolve)
+                .with_system(stop_step)
+                .into(),
+        );
+
+        app.register_inspectable::<LinearVelocity>()
         .register_inspectable::<Static>()
         .register_inspectable::<AngularVelocity>()
         .register_inspectable::<Elasticity>()
@@ -371,6 +373,13 @@ pub fn spawn(
             }
         }
     }
+}
+
+#[cfg(feature = "step")]
+fn stop_step(
+    mut commands: Commands,
+) {
+    commands.insert_resource(NextState(PhysicsState::Paused));
 }
 
 #[derive(Component)]

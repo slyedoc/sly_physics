@@ -427,6 +427,7 @@ pub fn solve(
 }
 
 
+// This cleans up any constraints that are no longer in range
 pub fn post_solve(
     mut manifold_arena: ResMut<PenetrationArena>,
     rb_query: Query<(&Transform, &CenterOfMass)>,

@@ -16,8 +16,6 @@ pub fn resolve_system(
         &InverseInertiaTensor,
     )>,
     config: Res<PhysicsConfig>,
-    #[cfg(feature = "step")]
-    mut commands: Commands,
 ) {
     let mut contacts = contacts_events.iter().collect::<Vec<_>>();
 
@@ -40,9 +38,6 @@ pub fn resolve_system(
     if time_remaining > 0.0 {
         step_rigibbodies(&mut query, time_remaining);
     }
-
-    #[cfg(feature = "step")]
-    commands.insert_resource(NextState(PhysicsState::Paused));
 }
 
 fn step_rigibbodies(
