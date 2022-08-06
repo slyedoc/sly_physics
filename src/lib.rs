@@ -262,7 +262,9 @@ impl Plugin for PhysicsPlugin {
                 .into(),
         );
 
-        app.register_inspectable::<LinearVelocity>()
+        app
+        .register_inspectable::<RigidBodyMode>()
+        .register_inspectable::<LinearVelocity>()
         .register_inspectable::<Static>()
         .register_inspectable::<AngularVelocity>()
         .register_inspectable::<Elasticity>()
@@ -273,6 +275,7 @@ impl Plugin for PhysicsPlugin {
         .register_inspectable::<InertiaTensor>()
         .register_inspectable::<InverseInertiaTensor>()
         .register_inspectable::<Collider>()
+        .register_inspectable::<Damping>()
         .register_inspectable::<Aabb>()
         .register_inspectable::<AabbWorld>()
         //.register_inspectable::<Bvh>()
