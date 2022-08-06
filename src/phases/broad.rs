@@ -14,7 +14,6 @@ pub fn broadphase_system(
     mut broad_contacts: EventWriter<BroadContact>,
     query: Query<(Entity, &AabbWorld, Option<&Static>), With<RigidBodyMode>>,
 ) {
-    info!("broadphase_system");
     // TODO: Yes, we are copying the array out here, only way to sort it
     // Ideally we would keep the array around, it should already near sorted
     let mut list = query.iter().collect::<Vec<_>>();

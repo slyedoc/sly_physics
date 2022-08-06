@@ -173,7 +173,6 @@ pub fn pre_solve(
     mut manifold_arena: ResMut<PenetrationArena>,
     config: Res<PhysicsConfig>,
 ) {
-    info!("pre_solve");
     for (&(a, b), manifold) in &mut manifold_arena.manifolds {
         let [(trans_a, mut lin_vel_a, mut ang_vel_a, inv_mass_a, frict_a, com_a, inv_inert_t_a), (trans_b, mut lin_vel_b, mut ang_vel_b, inv_mass_b, frict_b, com_b, inv_inert_t_b)] =
             rb_query.many_mut([a, b]);
@@ -330,7 +329,6 @@ pub fn solve(
         &InverseInertiaTensor,
     )>,    
 ) {
-    info!("solve");
     for (&(a, b), manifold) in &mut manifold_arena.manifolds {
         let [(
             trans_a,
