@@ -20,7 +20,7 @@ impl Plugin for PhysicsBvhCameraPlugin {
                 render_image
                     .run_in_state(PhysicsDebugState::Running)
                     .label(PhysicsSystems::Camera)
-                    .after(PhysicsSystems::ResolvePhase),
+                    .after(PhysicsSystems::Resolve),
             )
             .add_exit_system(PhysicsDebugState::Running, remove_ui);
     }

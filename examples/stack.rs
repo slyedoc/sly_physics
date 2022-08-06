@@ -1,5 +1,5 @@
 use bevy::{math::vec3, prelude::*, window::PresentMode};
-use bevy_inspector_egui::{Inspectable, InspectorPlugin, WorldInspectorPlugin};
+use bevy_inspector_egui::prelude::*;
 use helper::{AppState, HelperPlugin};
 use iyes_loopless::prelude::*;
 use sly_camera_controller::*;

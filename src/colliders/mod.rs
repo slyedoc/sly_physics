@@ -18,19 +18,18 @@ impl Default for Collider {
     }
 }
 
-
 pub struct ColliderResources {
     spheres: Vec::<SphereCollider>,
     boxes: Vec::<BoxCollider>,
-    convexes: Vec::<BoxCollider>,
+    //convexes: Vec::<BoxCollider>,
 }
 
 impl Default for ColliderResources {
     fn default() -> Self {
         ColliderResources {
-            spheres: vec![ SphereCollider { radius: 0.5 } ], // adding instance for a default value
+            spheres: vec![ SphereCollider { radius: 0.5 } ], // adding a instance for a default value
             boxes: Vec::new(),
-            convexes: Vec::new(),
+            //convexes: Vec::new(),
         }
     }
 }

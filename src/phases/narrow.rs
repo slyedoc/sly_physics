@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     PhysicsConfig,
-    constraints::ManifoldArena,
+    constraints::PenetrationArena,
     intersect::{*},
     types::{*},
     colliders::{*},
@@ -20,7 +20,7 @@ pub fn narrow_system(
     )>,
     mut broad_contacts: EventReader<BroadContact>,
     mut contacts: EventWriter<Contact>,
-    mut manifold_arean: ResMut<ManifoldArena>,
+    mut manifold_arean: ResMut<PenetrationArena>,
     config: Res<PhysicsConfig>,
     collider_resources: Res<ColliderResources>,
 ) {
@@ -151,7 +151,7 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
     i_tensor_b: &InertiaTensor, 
 
     pair: &BroadContact, 
-    manifold_arean:  &mut ManifoldArena, 
+    manifold_arean:  &mut PenetrationArena, 
     contacts: &mut EventWriter<Contact>,
     time: f32, 
 ) {

@@ -3,18 +3,34 @@ use bevy_inspector_egui::Inspectable;
 use iyes_loopless::prelude::*;
 
 use crate::{
-    InverseMass, LinearVelocity, Mass, PhysicsConfig, PhysicsState, Static,  
+    InverseMass, LinearVelocity, Mass, PhysicsConfig, PhysicsFixedUpdate, PhysicsState,
+    PhysicsSystems, Static,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+pub enum GravityState {
+    Running,
+    Paused,
+}
 
 pub struct GravityPlugin;
 
 impl Plugin for GravityPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Gravity>()
-            .add_system(gravity_system.run_in_state(PhysicsState::Running));
+            .add_loopless_state(GravityState::Running)
+            .add_system_set_to_stage(
+                PhysicsFixedUpdate,
+                ConditionSet::new()
+                    .run_in_state(PhysicsState::Running)
+                    .run_in_state(GravityState::Running)
+                    .label(PhysicsSystems::Setup)
+                    .with_system(gravity_system)
+                    .into(),
+            );
     }
 }
-  
+
 #[derive(Inspectable, Deref, DerefMut, Debug)]
 pub struct Gravity(pub Vec3);
 impl Default for Gravity {

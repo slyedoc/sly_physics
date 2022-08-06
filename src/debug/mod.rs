@@ -1,7 +1,7 @@
 mod bvh_camera;
 pub use bvh_camera::*;
 
-use crate::{bvh::Tlas, prelude::ManifoldArena, AabbWorld, PhysicsFixedUpdate, PhysicsState};
+use crate::{bvh::Tlas, prelude::PenetrationArena, AabbWorld, PhysicsFixedUpdate, PhysicsState};
 use bevy::prelude::*;
 use iyes_loopless::prelude::*;
 
@@ -151,7 +151,7 @@ fn spawn_contacts(
     query: Query<Entity, With<ContactDebug>>,
     mut meshes: ResMut<Assets<Mesh>>,
     debug_contact_material: Res<DebugContactMaterial>,
-    mut contact_manifold: Res<ManifoldArena>,
+    contact_manifold: Res<PenetrationArena>,
 ) {
     //remove old
     for e in query.iter() {

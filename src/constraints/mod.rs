@@ -4,7 +4,7 @@ mod constraint_hinge_quat;
 mod constraint_motor;
 mod constraint_mover;
 mod constraint_orientation;
-pub mod contact_manifold;
+pub mod penetration_manifold;
 pub mod distance;
 
 use crate::{
@@ -20,63 +20,9 @@ use bevy::prelude::*;
 // use constraint_motor::ConstraintMotor;
 // use constraint_mover::ConstraintMoverSimple;
 // use constraint_orientation::ConstraintOrientation;
-pub use contact_manifold::*;
+pub use penetration_manifold::*;
 
 
-pub fn cleanpup_contraints(
-    mut manifold_arena: ResMut<ManifoldArena>,
-    rb_query: Query<(&Transform, &CenterOfMass)>,
-) {
-    let mut remove_list = Vec::new();
-    for (&(a, b), manifold) in &mut manifold_arena.manifolds {
-        // remove any contacts that have drifted too far
-        let mut i = 0;
-
-        if let Ok([(trans_a, com_a), (trans_b, com_b)]) = rb_query.get_many([a, b]) {
-            while i < manifold.contacts.len() {
-                let contact = manifold.contacts[i];
-
-                // get the tangential distance of the point on a and the point on b
-                let a = RBHelper::local_to_world(trans_a, com_a, contact.local_point_a);
-                let b = RBHelper::local_to_world(trans_b, com_b, contact.local_point_b);
-
-                let mut normal = manifold.constraints[i].normal();
-                normal = trans_a.rotation * normal;
-
-                // calculate the tangential separation and penetration depth
-                let ab = b - a;
-                let penetration_depth = normal.dot(ab);
-                let ab_normal = normal * penetration_depth;
-                let ab_tangent = ab - ab_normal;
-
-                // if the tangential displacement is less than a specific threshold, it's okay to keep
-                // it.
-                const DISTANCE_THRESHOLD: f32 = 0.02;
-                if ab_tangent.length_squared() < DISTANCE_THRESHOLD * DISTANCE_THRESHOLD
-                    && penetration_depth <= 0.0
-                {
-                    i += 1;
-                    continue;
-                }
-
-                // this contact has moved beyond its threshold and should be removed
-                manifold.constraints.remove(i);
-                manifold.contacts.remove(i);
-            }
-        } else {
-            remove_list.push((a, b));
-        }
-    }
-
-    for k in remove_list {
-        manifold_arena.manifolds.remove(&k);
-    }
-
-    // if there are no contacts left, remove the manifold
-    manifold_arena
-        .manifolds
-        .retain(|&(_a, _b), manifold| manifold.contacts.len() > 0)
-}
 
 pub struct Constraint;
 

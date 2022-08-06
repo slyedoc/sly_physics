@@ -19,6 +19,7 @@ opt-level = 3
 default = ["continuous"]
 discrete = []
 continuous = []
+step = []
 trace = ["bevy/trace", "bevy/trace_chrome"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
