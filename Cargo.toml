@@ -2,10 +2,10 @@
 name = "sly_physics"
 version = "0.1.0"
 edition = "2021"
-
-[lib]
-crate-type = ["lib"]
-
+license = "MIT OR Apache-2.0"
+description = "A native physics engine for Bevy"
+readme = "README.md"
+repository = "https://github.com/slyedoc/sly_physics"
 
 # Enable only a small amount of optimization in debug mode
 [profile.dev]
@@ -16,7 +16,7 @@ opt-level = 1
 opt-level = 3
 
 [features]
-default = ["continuous", "step"]
+default = ["continuous"]
 discrete = []
 continuous = []
 step = []
@@ -34,9 +34,9 @@ bevy-inspector-egui = "0.12.1"
 sly_camera_controller = { git = "https://github.com/slyedoc/sly_camera_controller", branch = "main" }
 
 [[example]]
-name = "stack"
-crate-type = ["bin"]
+name = "main"
+path = "examples/main.rs"
 
-# [dev-dependencies]
-# bevy = "0.7.0"
-# rand = "0.8.5"
+[[example]]
+name = "stack"
+path = "examples/stack.rs"

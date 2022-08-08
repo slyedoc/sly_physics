@@ -162,7 +162,7 @@ fn spawn_contacts(
     }
 
     //add contact
-    for ((_e1, _e2), manifold) in &contact_manifold.manifolds {    
+    for (_pair, manifold) in &contact_manifold.manifolds {    
             commands
                 .spawn_bundle(PbrBundle {
                     transform: Transform::from_translation(manifold.contacts[0].world_point_a),

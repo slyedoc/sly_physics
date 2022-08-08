@@ -10,12 +10,12 @@ pub fn damping_system(
         &Damping,
     )>
 ) {
-    for (mut lin_vel, mut ang_vel, damping) in query.iter_mut() {
-        if lin_vel.length() < damping.linear {
-            lin_vel.0 = Vec3::ZERO;
-        }
-        if ang_vel.length() < damping.angular {
-            ang_vel.0 = Vec3::ZERO;
-        }
+    for (mut _lin_vel, mut _ang_vel, _damping) in query.iter_mut() {
+        // if lin_vel.length() < damping.linear {
+        //     lin_vel.0 = Vec3::ZERO;
+        // }
+        // if ang_vel.length() < damping.angular {
+        //     ang_vel.0 = Vec3::ZERO;
+        // }
     }
 }

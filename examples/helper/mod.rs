@@ -1,3 +1,6 @@
+mod overlay;
+mod picking;
+
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{prelude::*, math::vec3};
@@ -6,7 +9,9 @@ use sly_camera_controller::CameraController;
 use sly_physics::prelude::*;
 
 use overlay::OverlayPlugin;
-mod overlay;
+
+use picking::PickingPlugin;
+
 
 pub struct HelperPlugin;
 
@@ -14,6 +19,7 @@ impl Plugin for HelperPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(AppState::Playing)
             .add_plugin(OverlayPlugin)
+            .add_plugin(PickingPlugin)
             .add_system_to_stage( CoreStage::Update, reset_listen.run_in_state(AppState::Playing))
             .add_enter_system(AppState::Reset, reset)
             .add_system(toggle_physics)
@@ -113,7 +119,8 @@ fn toggle_physics(
     input: Res<Input<KeyCode>>,
     state: Res<CurrentState<PhysicsState>>,
 ) {
-    if input.pressed(KeyCode::Space) {
+
+    if input.just_pressed(KeyCode::Space) {
         let target = match state.0 {            
             PhysicsState::Running => PhysicsState::Paused,
             PhysicsState::Paused => PhysicsState::Running,

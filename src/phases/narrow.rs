@@ -204,6 +204,7 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
                 separation_dist: -(world_point_a - world_point_b).length(),
                 time_of_impact: toi,
             };
+            
             contact.correct(trans_a, trans_b);
 
             if contact.time_of_impact == 0.0 {

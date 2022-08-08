@@ -5,7 +5,6 @@ use crate::{
     Aabb, 
 };
 use bevy::prelude::*;
-use bevy::render::camera::CameraProjection;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Hit {
@@ -63,18 +62,17 @@ impl Ray {
     }
 
     // TODO: This is from bevy_mod_raycast, need to do more reading up on ndc
-    pub fn from_screenspace(
-        cursor_pos_screen: Vec2,
-        window: &Window,
-        projection: &PerspectiveProjection,
-        camera_transform: &GlobalTransform,
-    ) -> Self {
-        let camera_position = camera_transform.compute_matrix();
-        let screen_size = Vec2::from([window.width() as f32, window.height() as f32]);
-        let projection_matrix = projection.get_projection_matrix();
+    pub fn from_camera(
+        camera: &Camera,
+        camera_transform: &Transform,
+        cursor: Vec2,
+    ) -> Self {        
+        let screen_size = camera.logical_viewport_size().unwrap();
+        let camera_position = camera_transform.compute_matrix();        
+        let projection_matrix = camera.projection_matrix();
 
         // Normalized device coordinate cursor position from (-1, -1, -1) to (1, 1, 1)
-        let cursor_ndc = (cursor_pos_screen / screen_size) * 2.0 - Vec2::from([1.0, 1.0]);
+        let cursor_ndc = (cursor / screen_size) * 2.0 - Vec2::from([1.0, 1.0]);
         let cursor_pos_ndc_near: Vec3 = cursor_ndc.extend(-1.0);
         let cursor_pos_ndc_far: Vec3 = cursor_ndc.extend(1.0);
 

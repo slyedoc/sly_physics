@@ -1,4 +1,4 @@
-use crate::{tasks::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystems, Ray, Tlas};
+use crate::{utils::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystems, Ray, Tlas};
 use bevy::{
     math::vec3,
     prelude::*,

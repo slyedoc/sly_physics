@@ -1,4 +1,5 @@
 use bevy::{prelude::*, utils::HashMap};
+use bevy_inspector_egui::Inspectable;
 
 use crate::{
     math::{lcp_gauss_seidel, MatMN, MatN, VecN},
@@ -8,9 +9,37 @@ use crate::{
 
 use super::Constraint;
 
-#[derive(Debug, Default)]
+#[derive(Debug,  Default)]
 pub struct PenetrationArena {
-    pub manifolds: HashMap<(Entity, Entity), Manifold>,
+    pub manifolds: HashMap<EntityPair, Manifold>,
+}
+
+#[derive(Debug, Inspectable, Clone)]
+pub struct EntityPair {
+    pub a: Entity,
+    pub b: Entity,
+}
+
+impl EntityPair {
+    pub fn new(a: Entity, b: Entity) -> Self {
+        Self { a, b }
+    }
+}
+
+impl PartialEq for EntityPair {
+    fn eq(&self, other: &Self) -> bool {
+        (self.a == other.a && self.b == other.b)
+        || (self.a == other.a && self.b == other.a)
+    }
+}
+
+impl Eq for EntityPair {}
+
+impl std::hash::Hash for EntityPair {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let product = self.a.id() * self.b.id();
+        product.hash(state);
+    }
 }
 
 impl PenetrationArena {
@@ -22,12 +51,14 @@ impl PenetrationArena {
         trans_b: &Transform,
         com_b: &CenterOfMass,
     ) {
-        if let Some(m) = self.manifolds.get_mut(&(contact.a, contact.b)) {
+        let pair = EntityPair::new(contact.a, contact.b);
+
+        if let Some(m) = self.manifolds.get_mut( &pair) {
             m.add_contact(trans_a, com_a, trans_b, com_b, contact);
         } else {
             let mut m = Manifold::default();
             m.add_contact(trans_a, com_a, trans_b, com_b, contact);
-            self.manifolds.insert((contact.a, contact.b), m);
+            self.manifolds.insert(pair, m);
         }
     }
 
@@ -60,8 +91,6 @@ impl Manifold {
         com_b: &CenterOfMass,
         contact: Contact,
     ) {
-        // TODO: Need to make sure the contact's body_a and body_b are of the correct order
-
         // if this contact is close to another contact then keep the old contact
         for manifold_contact in &self.contacts {
             // TODO: can we just the world_points on the contact?
@@ -126,12 +155,14 @@ impl Manifold {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Inspectable, Copy, Clone, Debug, Default)]
 pub struct ConstraintPenetration {
     pub anchor_a: Vec3, // the anchor location in body_a's space
     pub anchor_b: Vec3, // the anchor location in body_b's space
 
+    #[inspectable(ignore)]
     pub jacobian: MatMN<3, 12>,
+    #[inspectable(ignore)]
     pub cached_lambda: VecN<3>,
     pub normal: Vec3, // in body A's local space
     pub baumgarte: f32,
@@ -173,10 +204,10 @@ pub fn pre_solve(
     mut manifold_arena: ResMut<PenetrationArena>,
     config: Res<PhysicsConfig>,
 ) {
-    for (&(a, b), manifold) in &mut manifold_arena.manifolds {
+    for (pair, manifold) in &mut manifold_arena.manifolds {
         if let Ok(
             [(trans_a, mut lin_vel_a, mut ang_vel_a, inv_mass_a, frict_a, com_a, inv_inert_t_a), (trans_b, mut lin_vel_b, mut ang_vel_b, inv_mass_b, frict_b, com_b, inv_inert_t_b)],
-        ) = rb_query.get_many_mut([a, b])
+        ) = rb_query.get_many_mut([pair.a, pair.b])
         {
             for constraint in manifold.constraints.iter_mut() {
                 // get the world space position of the hinge from body_a's orientation
@@ -312,7 +343,7 @@ pub fn pre_solve(
 
     manifold_arena
         .manifolds
-        .retain(|&(_a, _b), manifold| manifold.contacts.len() > 0)
+        .retain(|_pair, manifold| manifold.contacts.len() > 0)
 }
 
 pub fn solve(
@@ -322,35 +353,24 @@ pub fn solve(
         &mut LinearVelocity,
         &mut AngularVelocity,
         &InverseMass,
-        &Elasticity,
-        &Friction,
-        &CenterOfMass,
-        &InertiaTensor,
         &InverseInertiaTensor,
     )>,
 ) {
-    for (&(a, b), manifold) in &mut manifold_arena.manifolds {
+    for (pair, manifold) in &mut manifold_arena.manifolds {
         let [(
             trans_a,
             mut lin_vel_a,
             mut ang_vel_a,
             inv_mass_a,
-            _elas_a,
-            _frict_a,
-            _com_a,
-            _inertia_t_a,
+           
             inv_inertia_tensor_a,
         ), (
             trans_b,
             mut lin_vel_b,
             mut ang_vel_b,
             inv_mass_b,
-            _elas_b,
-            _frict_b,
-            _com_b,
-            _inertia_t_b,
             inv_inertia_tensor_b,
-        )] = rb_query.many_mut([a, b]);
+        )] = rb_query.many_mut([pair.a, pair.b]);
 
         for constraint in manifold.constraints.iter_mut() {
             let jacobian_transpose = constraint.jacobian.transpose();
@@ -429,10 +449,10 @@ pub fn post_solve(
     mut manifold_arena: ResMut<PenetrationArena>,
     rb_query: Query<(&Transform, &CenterOfMass)>,
 ) {
-    for (&(a, b), manifold) in &mut manifold_arena.manifolds {
+    for (pair, manifold) in &mut manifold_arena.manifolds {
         // remove any contacts that have drifted too far
         let mut i = 0;
-        if let Ok([(trans_a, com_a), (trans_b, com_b)]) = rb_query.get_many([a, b]) {
+        if let Ok([(trans_a, com_a), (trans_b, com_b)]) = rb_query.get_many([pair.a, pair.b]) {
             while i < manifold.contacts.len() {
                 let contact = manifold.contacts[i];
 
@@ -469,5 +489,5 @@ pub fn post_solve(
     // if there are no contacts left, remove the manifold
     manifold_arena
         .manifolds
-        .retain(|&(_a, _b), manifold| manifold.contacts.len() > 0)
+        .retain(|_pair, manifold| manifold.contacts.len() > 0)
 }

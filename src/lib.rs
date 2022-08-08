@@ -7,12 +7,13 @@ mod dynamics;
 mod intersect;
 mod math;
 mod phases;
-mod ray;
-mod tasks;
+mod utils;
 mod types;
+
 
 use bevy::{math::vec3, prelude::*};
 use bevy_inspector_egui::prelude::*;
+
 use constraints::{PenetrationArena};
 use iyes_loopless::prelude::*;
 use phases::{broadphase_system, narrow_system, resolve_system};
@@ -20,7 +21,6 @@ use phases::{broadphase_system, narrow_system, resolve_system};
 use bvh::*;
 use colliders::*;
 use prelude::GravityPlugin;
-use ray::Ray;
 use types::*;
 
 pub const PHYSISCS_TIMESTEP: f64 = 1.0 / 60.0;
@@ -42,7 +42,7 @@ pub mod prelude {
     pub use crate::{
         bvh::Tlas, colliders::Collider, colliders::ColliderResources, constraints::PenetrationArena,
         debug::BvhCamera, debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin,
-        debug::PhysicsDebugState, ray::Ray, types::AngularVelocity, types::CenterOfMass,
+        debug::PhysicsDebugState, bvh::Ray, types::AngularVelocity, types::CenterOfMass,
         types::Elasticity, types::Friction, types::InertiaTensor, types::LinearVelocity,
         types::Mass, types::RigidBodyMode, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin,
         PhysicsState, PhysicsSystems, dynamics::*, RigidBodyBundle, PHYSISCS_TIMESTEP,
@@ -115,6 +115,8 @@ pub struct PhysicsFixedUpdate;
 
 pub struct PhysicsPlugin;
 
+
+
 impl Plugin for PhysicsPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(PhysicsState::Running)
@@ -130,6 +132,7 @@ impl Plugin for PhysicsPlugin {
                 SystemStage::parallel(),
             )
             .add_plugin(GravityPlugin)
+
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
@@ -224,21 +227,21 @@ impl Plugin for PhysicsPlugin {
                 .with_system(constraints::distance::post_solve)
                 .into(),
         )
-        // .add_system_set_to_stage(
-        //     PhysicsFixedUpdate,
-        //     ConditionSet::new()
-        //         .run_in_state(PhysicsState::Running)
-        //         .label(PhysicsSystems::Damping)
-        //         .after(PhysicsSystems::ConstraintPostSolve)
-        //         .with_system(damping::damping_system)
-        //         .into(),
-        // )
+        .add_system_set_to_stage(
+            PhysicsFixedUpdate,
+            ConditionSet::new()
+                .run_in_state(PhysicsState::Running)
+                .label(PhysicsSystems::Damping)
+                .after(PhysicsSystems::ConstraintPostSolve)
+                .with_system(damping::damping_system)
+                .into(),
+        )
         .add_system_set_to_stage(
             PhysicsFixedUpdate,
             ConditionSet::new()
                 .run_in_state(PhysicsState::Running)
                 .label(PhysicsSystems::Resolve)
-                .after(PhysicsSystems::ConstraintPostSolve)
+                .after(PhysicsSystems::Damping)
                 .with_system(resolve_system)
                 .into(),
         )

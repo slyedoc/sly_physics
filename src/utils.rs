@@ -1,5 +1,6 @@
 use bevy::tasks::TaskPool;
 
+/// task parallel slice map with enumerator, used for bvh camera
 pub trait ParallelSliceEnumerateMut<T: Send>: AsMut<[T]> {
     fn par_chunk_map_enumerate_mut<F, R>(
         &mut self,
