@@ -52,10 +52,10 @@ pub enum StackMode {
 impl Default for Stack {
     fn default() -> Self {
         Self {
-            count: (2u32, 6u32, 3u32),
-            spacing: 1.0,
+            count: (2u32, 2u32, 3u32),
+            spacing: 1.2,
             time_scale: 1.0,
-            mode: StackMode::Sphere,
+            mode: StackMode::Box,
             ball_velocity: 0.0,
         }
     }

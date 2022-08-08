@@ -27,17 +27,17 @@ pub struct Contact {
 }
 
 impl Contact {
-    pub fn correct(&mut self, trans_a: &Transform, trans_b: &Transform) {
+    pub fn correct(&mut self, a: Entity, trans_a: &Transform, b: Entity, trans_b: &Transform) {
     
         // edit contacts so A < B, makes manifold lookups easier        
-        // if trans_a.translation.x > trans_b.translation.x || 
-        //     (trans_a.translation.x == trans_b.translation.x && trans_a.translation.y > trans_b.translation.y) || 
-        //     (trans_a.translation.x == trans_b.translation.x && trans_a.translation.y == trans_b.translation.y && trans_a.translation.z > trans_b.translation.z) 
-        // {
-        //     std::mem::swap(&mut self.local_point_a, &mut self.local_point_b);
-        //     std::mem::swap(&mut self.world_point_a, &mut self.world_point_b);
-        //     std::mem::swap(&mut self.a, &mut self.b);
-        // }
+        if trans_a.translation.x > trans_b.translation.x || 
+            (trans_a.translation.x == trans_b.translation.x && trans_a.translation.y > trans_b.translation.y) || 
+            (trans_a.translation.x == trans_b.translation.x && trans_a.translation.y == trans_b.translation.y && trans_a.translation.z > trans_b.translation.z) {
+        //if  a.id() > b.id() {
+            std::mem::swap(&mut self.local_point_a, &mut self.local_point_b);
+            std::mem::swap(&mut self.world_point_a, &mut self.world_point_b);
+            std::mem::swap(&mut self.a, &mut self.b);
+        }
     }
 }
 

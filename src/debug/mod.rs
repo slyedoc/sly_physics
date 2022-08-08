@@ -23,14 +23,14 @@ pub struct AabbDebug(pub Entity);
 #[derive(Component)]
 pub struct AabbWorldDebug(pub Entity);
 
-#[derive(Component)]
-pub struct DebugContactMaterial(Handle<StandardMaterial>);
+
 
 pub struct PhysicsDebugPlugin;
 impl Plugin for PhysicsDebugPlugin {
     fn build(&self, app: &mut App) {
-        app.add_loopless_state(PhysicsDebugState::Paused)
-            .add_startup_system(setup)
+        app
+            .init_resource::<DebugContactMaterial>()
+            .add_loopless_state(PhysicsDebugState::Paused)
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
@@ -55,14 +55,7 @@ impl Plugin for PhysicsDebugPlugin {
     }
 }
 
-fn setup(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
-    commands.insert_resource::<DebugContactMaterial>(DebugContactMaterial(
-        materials.add(StandardMaterial {
-            base_color: Color::rgb(0.5, 0.5, 0.5),
-            ..default()
-        }),
-    ));
-}
+
 
 fn spawn_debug(
     mut commands: Commands,
@@ -149,6 +142,28 @@ fn spawn_bvh_debug(
 #[derive(Component)]
 struct ContactDebug;
 
+#[derive(Component)]
+pub struct DebugContactMaterial{
+    a_material: Handle<StandardMaterial>,
+    b_material: Handle<StandardMaterial>,
+}
+
+impl FromWorld for DebugContactMaterial {
+    fn from_world(world: &mut World) -> Self {
+        let mut materials = world.get_resource_mut::<Assets<StandardMaterial>>().unwrap();
+        Self {
+            a_material: materials.add(StandardMaterial { 
+                base_color: Color::rgb(0.0, 1.0, 0.0),
+                ..default() 
+            }),
+            b_material: materials.add(StandardMaterial { 
+                base_color: Color::rgb(0.0, 0.0, 1.0),
+                ..default() 
+            }),
+        }
+    }
+}
+
 fn spawn_contacts(
     mut commands: Commands,
     query: Query<Entity, With<ContactDebug>>,
@@ -162,21 +177,39 @@ fn spawn_contacts(
     }
 
     //add contact
-    for (_pair, manifold) in &contact_manifold.manifolds {    
+    for (_pair, manifold) in &contact_manifold.manifolds {
+        for contact in &manifold.contacts {
             commands
                 .spawn_bundle(PbrBundle {
-                    transform: Transform::from_translation(manifold.contacts[0].world_point_a),
+                    transform: Transform::from_translation(contact.world_point_a),
                     mesh: meshes.add(Mesh::from(shape::UVSphere {
                         radius: 0.1,
                         ..default()
                     })),
-                    material: debug_contact_material.0.clone(),
+                    material: debug_contact_material.a_material.clone(),
                     visibility: Visibility { is_visible: true },
                     ..Default::default()
                 })
                 .insert(ContactDebug)
                 .insert(PhysicsDebug)
-                .insert(Name::new("Contact Debug"));
+                .insert(Name::new("Contact Debug A"));
+
+
+                commands
+                .spawn_bundle(PbrBundle {
+                    transform: Transform::from_translation(contact.world_point_b),
+                    mesh: meshes.add(Mesh::from(shape::UVSphere {
+                        radius: 0.1,
+                        ..default()
+                    })),
+                    material: debug_contact_material.b_material.clone(),
+                    visibility: Visibility { is_visible: true },
+                    ..Default::default()
+                })
+                .insert(ContactDebug)
+                .insert(PhysicsDebug)
+                .insert(Name::new("Contact Debug B"));
+        }
         
     }
 }

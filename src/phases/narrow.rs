@@ -103,7 +103,7 @@ pub fn narrow_system(
                         separation_dist,
                         time_of_impact,
                     };
-                    c.correct(&trans_a, &trans_b);
+                    c.correct(pair.a, &trans_a, pair.b, &trans_b);
                     contacts.send(c);
                     
                 }
@@ -205,7 +205,7 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
                 time_of_impact: toi,
             };
             
-            contact.correct(trans_a, trans_b);
+            contact.correct(pair.a, trans_a, pair.b, trans_b);
 
             if contact.time_of_impact == 0.0 {
                 manifold_arean.add_contact(contact, &trans_a, com_a, &trans_b, com_b);
