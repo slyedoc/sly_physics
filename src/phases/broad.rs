@@ -60,10 +60,18 @@ pub fn broadphase_system(
                 continue;
             }
 
-            broad_contacts.send(BroadContact {
-                a: *a,
-                b: *b,
-            });
+            if a.id() < b.id() {
+                broad_contacts.send(BroadContact {
+                    a: *a,
+                    b: *b,
+                });
+            } else {
+                broad_contacts.send(BroadContact {
+                    a: *b,
+                    b: *a,
+                });
+            }
+            
         }
     }
 }

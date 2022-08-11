@@ -2,6 +2,42 @@ use bevy::{prelude::*, render::mesh::{PrimitiveTopology, Indices}};
 
 use crate::types::Aabb;
 
+use super::ColliderTrait;
+
+#[derive(Debug)]
+pub struct ConvexCollider { 
+    pub verts: Vec<Vec3>
+}
+
+impl ConvexCollider {
+    pub fn new(verts: &[Vec3]) -> Self {
+        ConvexCollider {
+            verts: verts.to_vec()
+        }
+    }
+}
+
+impl ColliderTrait for ConvexCollider {
+    fn get_center_of_mass(&self) -> Vec3 {
+        todo!()
+    }
+
+    fn get_inertia_tensor(&self) -> Mat3 {
+        todo!()
+    }
+
+    fn get_aabb(&self) -> Aabb {
+        todo!()
+    }
+
+    fn get_support(&self, trans: &Transform, dir: Vec3, bias: f32) -> Vec3 {
+        todo!()
+    }
+
+    fn fastest_linear_speed(&self, angular_velocity: Vec3, dir: Vec3) -> f32 {
+        todo!()
+    }
+}
 
 pub fn create_convex_mesh_from_verts(verts: &[Vec3]) -> Mesh {
 

@@ -92,7 +92,7 @@ pub fn narrow_system(
                     let ab = trans_a.translation - trans_b.translation;
                     let separation_dist = ab.length() - (sphere_a.radius + sphere_b.radius);
 
-                    let mut c = Contact {
+                    contacts.send(Contact {
                         a: pair.a,
                         b: pair.b,
                         world_point_a,
@@ -102,9 +102,7 @@ pub fn narrow_system(
                         normal,
                         separation_dist,
                         time_of_impact,
-                    };
-                    c.correct(pair.a, &trans_a, pair.b, &trans_b);
-                    contacts.send(c);
+                    });
                     
                 }
             }
@@ -193,7 +191,7 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
                 -toi,
             );
 
-            let mut contact = Contact {
+            let contact = Contact {
                 a: pair.a,
                 b: pair.b,
                 world_point_a,
@@ -204,8 +202,6 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
                 separation_dist: -(world_point_a - world_point_b).length(),
                 time_of_impact: toi,
             };
-            
-            contact.correct(pair.a, trans_a, pair.b, trans_b);
 
             if contact.time_of_impact == 0.0 {
                 manifold_arean.add_contact(contact, &trans_a, com_a, &trans_b, com_b);
@@ -217,10 +213,6 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
         }
 
         num_iters += 1;
-        // if num_iters > 2 {
-        //     // TODO: remove this, just wanted to see how oftent this is hit
-        //     info!("num_iters: {}", num_iters);
-        // }
         if num_iters > 10 {
             break;
         }

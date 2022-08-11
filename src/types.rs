@@ -26,20 +26,6 @@ pub struct Contact {
     pub time_of_impact: f32,
 }
 
-impl Contact {
-    pub fn correct(&mut self, a: Entity, trans_a: &Transform, b: Entity, trans_b: &Transform) {
-    
-        // edit contacts so A < B, makes manifold lookups easier        
-        if trans_a.translation.x > trans_b.translation.x || 
-            (trans_a.translation.x == trans_b.translation.x && trans_a.translation.y > trans_b.translation.y) || 
-            (trans_a.translation.x == trans_b.translation.x && trans_a.translation.y == trans_b.translation.y && trans_a.translation.z > trans_b.translation.z) {
-        //if  a.id() > b.id() {
-            std::mem::swap(&mut self.local_point_a, &mut self.local_point_b);
-            std::mem::swap(&mut self.world_point_a, &mut self.world_point_b);
-            std::mem::swap(&mut self.a, &mut self.b);
-        }
-    }
-}
 
 #[derive(Component, Inspectable, Debug)]
 pub struct RBHelper;
