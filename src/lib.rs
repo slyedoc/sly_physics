@@ -36,6 +36,8 @@ const MAX_ANGULAR_SPEED_SQ: f32 = MAX_ANGULAR_SPEED * MAX_ANGULAR_SPEED;
 const EPSILON: f32 = 0.001;
 const EPSILON_SQ: f32 = EPSILON * EPSILON;
 
+const BOUNDS_EPS: f32 = 0.01;
+
 pub mod prelude {
     pub use crate::{
         bvh::Ray, bvh::Tlas, colliders::*, constraints::PenetrationArena, debug::BvhCamera,
@@ -60,11 +62,11 @@ pub struct RigidBodyBundle {
     pub inertia_tensor: InertiaTensor,
     pub damping: Damping,
     pub aabb_world: AabbWorld,
+    pub inverse_inertia_tensor: InverseInertiaTensor,
     // Will be added
     // Static - if mode is static static
 
     // InverseMass,
-    // InverseInertiaTensor,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
@@ -141,14 +143,13 @@ impl Plugin for PhysicsPlugin {
                     .with_system(spawn)
                     .into(),
             )
-
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
                     .label(PhysicsSystems::Update)
                     .after(PhysicsSystems::Setup)
-                    .with_system(update_aabb) 
+                    .with_system(update_aabb)
                     .into(),
             )
             .add_system_set_to_stage(
@@ -223,7 +224,7 @@ impl Plugin for PhysicsPlugin {
             ConditionSet::new()
                 .run_in_state(PhysicsState::Running)
                 .label(PhysicsSystems::ConstraintPostSolve)
-                .after( match MAX_SOLVE_ITERS {
+                .after(match MAX_SOLVE_ITERS {
                     0 => unreachable!(),
                     1 => PhysicsSystems::ConstraintSolve0,
                     2 => PhysicsSystems::ConstraintSolve1,
@@ -268,7 +269,6 @@ impl Plugin for PhysicsPlugin {
     }
 }
 
-
 fn register_inspectable_system(mut registry: ResMut<InspectableRegistry>) {
     registry.register::<RigidBodyMode>();
     registry.register::<LinearVelocity>();
@@ -299,20 +299,27 @@ pub fn spawn(
     mut query: Query<
         (
             Entity,
-            &Transform,
             &Collider,
             &RigidBodyMode,
             &mut Mass,
             &mut CenterOfMass,
             &mut InertiaTensor,
-            &mut AabbWorld,
+            &mut InverseInertiaTensor,
         ),
         Added<Collider>,
     >,
     mut tlas: ResMut<Tlas>,
     collider_resources: Res<ColliderResources>,
 ) {
-    for (e, trans, collider, rb_mode, mut mass, mut center_of_mass, mut inertia_tensor, mut aabb_world) in query.iter_mut()
+    for (
+        e,
+        collider,
+        rb_mode,
+        mut mass,
+        mut center_of_mass,
+        mut inertia_tensor,
+        mut inverse_inertia_tensor,
+    ) in query.iter_mut()
     {
         // Setup RigidBody components
         let is_static = match rb_mode {
@@ -338,14 +345,8 @@ pub fn spawn(
             Collider::Sphere(index) => {
                 let sphere = collider_resources.get_sphere(*index);
                 center_of_mass.0 = sphere.get_center_of_mass();
-                let tensor = sphere.get_inertia_tensor();
-                inertia_tensor.0 = tensor;                
-                aabb_world.0 = sphere.get_world_aabb(trans);
-                    
-
-                commands
-                    .entity(e)
-                    .insert(InverseInertiaTensor(tensor.inverse() * inv_mass));
+                inertia_tensor.0 = sphere.get_inertia_tensor();
+                inverse_inertia_tensor.0 = inertia_tensor.0.inverse() * inv_mass;
 
                 let bvh_mesh = Mesh::from(shape::UVSphere {
                     radius: sphere.radius,
@@ -362,11 +363,7 @@ pub fn spawn(
                 let cube = collider_resources.get_cube(*index);
                 center_of_mass.0 = cube.get_center_of_mass();
                 inertia_tensor.0 = cube.get_inertia_tensor();
-                aabb_world.0 = cube.get_world_aabb(trans);
-
-                commands
-                    .entity(e)
-                    .insert(InverseInertiaTensor(inertia_tensor.0.inverse() * inv_mass));
+                inverse_inertia_tensor.0 = inertia_tensor.0.inverse() * inv_mass;
 
                 let bvh_mesh = Mesh::from(shape::Box::new(cube.size.x, cube.size.y, cube.size.z));
                 let bvh_tri = parse_bvh_mesh(&bvh_mesh);
@@ -377,11 +374,7 @@ pub fn spawn(
                 let convex = collider_resources.get_convex(*index);
                 center_of_mass.0 = convex.get_center_of_mass();
                 inertia_tensor.0 = convex.get_inertia_tensor();
-                aabb_world.0 = convex.get_world_aabb(trans);
-
-                commands
-                    .entity(e)
-                    .insert(InverseInertiaTensor(inertia_tensor.0.inverse() * inv_mass));
+                inverse_inertia_tensor.0 = inertia_tensor.0.inverse() * inv_mass;
 
                 let bvh_mesh = Mesh::from(convex);
                 let bvh_tri = parse_bvh_mesh(&bvh_mesh);
@@ -403,27 +396,24 @@ pub fn update_aabb(
     collider_resources: Res<ColliderResources>,
 ) {
     for (trans, mut aabb_world, collider, lin_vel) in query.iter_mut() {
-        
         //update aabbworld
         aabb_world.0 = match collider {
-            Collider::Sphere(index) => collider_resources.get_sphere(*index).get_world_aabb(trans),
-            Collider::Box(index) => collider_resources.get_cube(*index).get_world_aabb(trans),
-            Collider::Convex(index) => collider_resources.get_convex(*index).get_world_aabb(trans),
+            Collider::Sphere(index) => {
+                collider_resources
+                    .get_sphere(*index)
+                    .get_world_aabb(trans, lin_vel, config.time)
+            }
+            Collider::Box(index) => {
+                collider_resources
+                    .get_cube(*index)
+                    .get_world_aabb(trans, lin_vel, config.time)
+            }
+            Collider::Convex(index) => {
+                collider_resources
+                    .get_convex(*index)
+                    .get_world_aabb(trans, lin_vel, config.time)
+            }
         };
-
-        // expand by the linear velocity
-        let p1 = aabb_world.0.mins + lin_vel.0 * config.time;
-        aabb_world.0.expand_by_point(p1);
-        let p2 = aabb_world.0.maxs + lin_vel.0 * config.time;
-        aabb_world.0.expand_by_point(p2);
-
-        // ex
-        const BOUNDS_EPS: f32 = 0.01;
-        let p3 = aabb_world.0.mins - Vec3::splat(BOUNDS_EPS);
-        aabb_world.0.expand_by_point(p3);
-        let p4 = aabb_world.0.maxs + Vec3::splat(BOUNDS_EPS);
-        aabb_world.0.expand_by_point(p4);
-
     }
 }
 

@@ -1,6 +1,9 @@
 use bevy::{math::vec3, prelude::*};
 
-use crate::types::Aabb;
+use crate::{
+    types::{Aabb, LinearVelocity},
+    BOUNDS_EPS,
+};
 
 use super::{fastest_linear_speed, find_support_point, ColliderTrait};
 
@@ -78,12 +81,30 @@ impl ColliderTrait for BoxCollider {
         self.aabb
     }
 
-    fn get_world_aabb(&self, trans: &Transform) -> Aabb {
+    fn get_world_aabb(
+        &self,
+        trans: &Transform,
+        linear_velocity: &LinearVelocity,
+        time: f32,
+    ) -> Aabb {
         let mut aabb = Aabb::default();
         for pt in &self.verts {
             let pt = (trans.rotation * *pt) + trans.translation;
             aabb.expand_by_point(pt);
         }
+        // expand by the linear velocity
+        let p1 = aabb.mins + linear_velocity.0 * time;
+        aabb.expand_by_point(p1);
+        let p2 = aabb.maxs + linear_velocity.0 * time;
+        aabb.expand_by_point(p2);
+
+        // ex
+
+        let p3 = aabb.mins - Vec3::splat(BOUNDS_EPS);
+        aabb.expand_by_point(p3);
+        let p4 = aabb.maxs + Vec3::splat(BOUNDS_EPS);
+        aabb.expand_by_point(p4);
+
         aabb
     }
 

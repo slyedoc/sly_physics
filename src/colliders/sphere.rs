@@ -1,10 +1,9 @@
-use bevy::{prelude::*, math::vec3};
-use crate::types::Aabb;
+use crate::{prelude::LinearVelocity, types::Aabb, BOUNDS_EPS};
+use bevy::{math::vec3, prelude::*};
 
 use super::ColliderTrait;
 
-
-pub struct SphereCollider { 
+pub struct SphereCollider {
     pub radius: f32,
     aabb: Aabb,
     center_of_mass: Vec3,
@@ -30,7 +29,6 @@ impl SphereCollider {
     }
 }
 
-
 impl ColliderTrait for SphereCollider {
     fn get_center_of_mass(&self) -> Vec3 {
         self.center_of_mass
@@ -44,11 +42,31 @@ impl ColliderTrait for SphereCollider {
         self.aabb
     }
 
-    fn get_world_aabb(&self,  trans: &Transform) -> Aabb {
-            Aabb {
-                mins: trans.translation - self.radius,
-                maxs: trans.translation + self.radius,
-            }
+    fn get_world_aabb(
+        &self,
+        trans: &Transform,
+        linear_velocity: &LinearVelocity,
+        time: f32,
+    ) -> Aabb {
+        let mut aabb = Aabb {
+            mins: trans.translation - self.radius,
+            maxs: trans.translation + self.radius,
+        };
+
+        // expand by the linear velocity
+        let p1 = aabb.mins + linear_velocity.0 * time;
+        aabb.expand_by_point(p1);
+        let p2 = aabb.maxs + linear_velocity.0 * time;
+        aabb.expand_by_point(p2);
+
+        // ex
+
+        let p3 = aabb.mins - Vec3::splat(BOUNDS_EPS);
+        aabb.expand_by_point(p3);
+        let p4 = aabb.maxs + Vec3::splat(BOUNDS_EPS);
+        aabb.expand_by_point(p4);
+
+        aabb
     }
 
     fn get_support(&self, trans: &Transform, dir: Vec3, bias: f32) -> Vec3 {
