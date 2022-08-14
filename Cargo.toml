@@ -32,6 +32,8 @@ iyes_loopless = { version = "0.7.0" }
 [dev-dependencies]
 bevy-inspector-egui = "0.12.1"
 sly_camera_controller = { git = "https://github.com/slyedoc/sly_camera_controller", branch = "main" }
+criterion = { version = "0.3", features = ["html_reports"] }
+image = "0.24.2" # only used for criterian debugging
 
 [[example]]
 name = "main"
@@ -40,3 +42,7 @@ path = "examples/main.rs"
 [[example]]
 name = "stack"
 path = "examples/stack.rs"
+
+[[bench]]
+name = "stack"
+harness = false

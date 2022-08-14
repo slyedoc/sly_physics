@@ -2,7 +2,7 @@ mod bvh_camera;
 pub use bvh_camera::*;
 
 use crate::{bvh::Tlas, prelude::PenetrationArena, AabbWorld, PhysicsFixedUpdate, PhysicsState, PhysicsSystems};
-use bevy::prelude::*;
+use bevy::{prelude::*, render::view::NoFrustumCulling, pbr::NotShadowCaster};
 use iyes_loopless::prelude::*;
 
 #[derive(Component)]
@@ -15,21 +15,16 @@ pub enum PhysicsDebugState {
 }
 
 #[derive(Component)]
-pub struct ManifoldDebug;
-
-#[derive(Component)]
 pub struct AabbDebug(pub Entity);
 
 #[derive(Component)]
 pub struct AabbWorldDebug(pub Entity);
 
-
-
 pub struct PhysicsDebugPlugin;
 impl Plugin for PhysicsDebugPlugin {
     fn build(&self, app: &mut App) {
         app
-            .init_resource::<DebugContactMaterial>()
+            .init_resource::<DebugMaterials>()
             .add_loopless_state(PhysicsDebugState::Paused)
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
@@ -46,7 +41,7 @@ impl Plugin for PhysicsDebugPlugin {
                     .run_in_state(PhysicsDebugState::Running)
                     .run_in_state(PhysicsState::Running)
                     .after(PhysicsSystems::Update)
-                    .with_system(spawn_debug)
+                    .with_system(spawn_aabb_debug)
                     .with_system(spawn_bvh_debug)
                     .with_system(spawn_contacts)
                     .into(),
@@ -55,21 +50,59 @@ impl Plugin for PhysicsDebugPlugin {
     }
 }
 
+#[derive(Component)]
+pub struct DebugMaterials{
+    contact_material_a: Handle<StandardMaterial>,
+    contact_material_b: Handle<StandardMaterial>,
+    bvh_aabb_material: Handle<StandardMaterial>,
+    aabb_material: Handle<StandardMaterial>,
+}
 
+impl FromWorld for DebugMaterials {
+    fn from_world(world: &mut World) -> Self {
+        let mut materials = world.get_resource_mut::<Assets<StandardMaterial>>().unwrap();
+        Self {
+            contact_material_a: materials.add(StandardMaterial { 
+                unlit: true,
+                base_color: Color::rgb(0.0, 1.0, 0.0),
+                ..default() 
+            }),
+            contact_material_b: materials.add(StandardMaterial { 
+                unlit: true,
+                base_color: Color::rgb(0.0, 0.0, 1.0),
+                ..default() 
+            }),
+            bvh_aabb_material: materials.add(StandardMaterial { 
+                unlit: true,
+                base_color: Color::rgb(0.0, 1.0, 0.0),
+                ..default() 
+            }),
+            aabb_material: materials.add(StandardMaterial { 
+                unlit: true,
+                base_color: Color::rgb(0.0, 0.0, 1.0),
+                ..default() 
+            }),
+        }
+    }
+}
 
-fn spawn_debug(
+fn spawn_aabb_debug(
     mut commands: Commands,
     query: Query<(Entity, &AabbWorld, &Transform), Without<AabbWorldDebug>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    debug_material: Res<DebugMaterials>,
 ) {
     for (e, aabb_world, _trans) in query.iter() {
         let id = commands
             .spawn_bundle(PbrBundle {
                 //transform: Transform::from_translation(trans.translation),
+                material: debug_material.aabb_material.clone(),
                 mesh: meshes.add(Mesh::from(&aabb_world.0)),
                 visibility: Visibility { is_visible: true },
                 ..Default::default()
             })
+            .insert(NoFrustumCulling)
+            .insert(NotShadowCaster)
             .insert(PhysicsDebug)
             .insert(Name::new("Aabb World Debug"))
             .id();
@@ -98,7 +131,6 @@ pub fn remove_debug(
 ) {
     // Remove debug components
     for e in query.iter() {
-        // commands.entity(e).remove::<AabbDebug>();
         commands.entity(e).remove::<AabbWorldDebug>();
     }
 
@@ -116,6 +148,7 @@ fn spawn_bvh_debug(
     query: Query<Entity, With<BvhAabbDebug>>,
     mut meshes: ResMut<Assets<Mesh>>,
     tlas: Res<Tlas>,
+    debug_material: Res<DebugMaterials>,
 ) {
     //remove old
     for e in query.iter() {
@@ -127,11 +160,14 @@ fn spawn_bvh_debug(
         if !node.is_leaf() {
             commands
                 .spawn_bundle(PbrBundle {
-                    //transform: Transform::from_translation(trans.translation),
+                   //transform: Transform::from_translation(trans.translation),
+                   material: debug_material.bvh_aabb_material.clone(),
                     mesh: meshes.add(Mesh::from(&node.aabb)),
                     visibility: Visibility { is_visible: true },
                     ..Default::default()
                 })
+                .insert(NoFrustumCulling)
+                .insert(NotShadowCaster)
                 .insert(BvhAabbDebug)
                 .insert(PhysicsDebug)
                 .insert(Name::new("Bvh Aabb Debug"));
@@ -142,33 +178,13 @@ fn spawn_bvh_debug(
 #[derive(Component)]
 struct ContactDebug;
 
-#[derive(Component)]
-pub struct DebugContactMaterial{
-    a_material: Handle<StandardMaterial>,
-    b_material: Handle<StandardMaterial>,
-}
 
-impl FromWorld for DebugContactMaterial {
-    fn from_world(world: &mut World) -> Self {
-        let mut materials = world.get_resource_mut::<Assets<StandardMaterial>>().unwrap();
-        Self {
-            a_material: materials.add(StandardMaterial { 
-                base_color: Color::rgb(0.0, 1.0, 0.0),
-                ..default() 
-            }),
-            b_material: materials.add(StandardMaterial { 
-                base_color: Color::rgb(0.0, 0.0, 1.0),
-                ..default() 
-            }),
-        }
-    }
-}
 
 fn spawn_contacts(
     mut commands: Commands,
     query: Query<Entity, With<ContactDebug>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    debug_contact_material: Res<DebugContactMaterial>,
+    debug_material: Res<DebugMaterials>,
     contact_manifold: Res<PenetrationArena>,
 ) {
     //remove old
@@ -186,7 +202,7 @@ fn spawn_contacts(
                         radius: 0.1,
                         ..default()
                     })),
-                    material: debug_contact_material.a_material.clone(),
+                    material: debug_material.contact_material_a.clone(),
                     visibility: Visibility { is_visible: true },
                     ..Default::default()
                 })
@@ -202,7 +218,7 @@ fn spawn_contacts(
                         radius: 0.1,
                         ..default()
                     })),
-                    material: debug_contact_material.b_material.clone(),
+                    material: debug_material.contact_material_b.clone(),
                     visibility: Visibility { is_visible: true },
                     ..Default::default()
                 })

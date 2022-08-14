@@ -18,7 +18,7 @@ fn main() {
         .add_plugin(CameraControllerPlugin)
         // our phsycis plugin
         .add_plugin(PhysicsPlugin)
-        
+        .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
         .add_plugin(PhysicsBvhCameraPlugin)
 

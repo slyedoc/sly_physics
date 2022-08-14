@@ -38,6 +38,10 @@ pub fn setup_camera(mut commands: Commands) {
     commands
         .spawn_bundle(DirectionalLightBundle {
             transform: Transform::from_xyz(50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
+            directional_light: DirectionalLight {
+                shadows_enabled: true,
+                ..default()
+            },
             ..default()
         })
         .insert(Keep);

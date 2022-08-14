@@ -1,5 +1,5 @@
 use crate::{Aabb, BVH_BIN_COUNT};
-use bevy::{math::vec3, prelude::*, reflect::TypeUuid};
+use bevy::{ prelude::*, reflect::TypeUuid};
 
 use super::BvhTri;
 
@@ -37,25 +37,6 @@ impl BvhInstance {
             bvh_index,
             inv_trans: Mat4::default(),
             bounds: Aabb::default(),
-        }
-    }
-
-    pub fn update(&mut self, trans: &Transform, root: &BvhNode) {
-        
-
-        // Update inv transfrom matrix for faster intersections
-        let trans_matrix = trans.compute_matrix();
-        self.inv_trans = trans_matrix.inverse();
-
-        // calculate world-space bounds using the new matrix
-        let bmin = root.aabb.mins;
-        let bmax = root.aabb.maxs;
-        for i in 0..8 {
-            self.bounds.grow(trans_matrix.transform_point3(vec3(
-                if i & 1 != 0 { bmax.x } else { bmin.x },
-                if i & 2 != 0 { bmax.y } else { bmin.y },
-                if i & 4 != 0 { bmax.z } else { bmin.z },
-            )));
         }
     }
 }

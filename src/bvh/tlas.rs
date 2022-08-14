@@ -1,6 +1,6 @@
-use bevy::prelude::*;
+use bevy::{prelude::*};
 
-use crate::{Aabb, Bvh, BvhInstance};
+use crate::{Aabb, Bvh, BvhInstance, types::AabbWorld};
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct TlasNode {
@@ -124,15 +124,14 @@ impl Tlas {
         best_b
     }
 
-    pub fn update_bvh_instances(&mut self, query: &Query<&Transform>) {
+    pub fn update_bvh_instances(&mut self, query: &Query<(&Transform, &AabbWorld)>) {
         let mut remove_list = Vec::new();
         for instance in &mut self.blas {
-            let bvh = &self.bvhs[instance.bvh_index];
-            if let Ok(trans) = query.get(instance.entity) {
-                // todo: going reset the aabb, clear here so tlas is really rebuilt
-                instance.bounds.clear();
+            if let Ok( (trans, aabb) ) = query.get(instance.entity) {
+                let trans_matrix = trans.compute_matrix();
+                instance.inv_trans = trans_matrix.inverse();
+                instance.bounds = aabb.0;
 
-                instance.update(trans, &bvh.nodes[0]);
             } else {
                 remove_list.push(instance.entity);
             }

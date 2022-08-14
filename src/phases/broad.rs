@@ -128,7 +128,7 @@ pub fn broadphase_system_bvh(tlas: Res<Tlas>, mut broad_contacts: EventWriter<Br
     let mut b = tlas.tlas_nodes[0].right();
     let mut stack = Vec::new();
     loop {
-        info!("test a: {}, b: {}", a, b);
+        //info!("test a: {}, b: {}", a, b);
         if tlas.tlas_nodes[a].aabb.intersection(&tlas.tlas_nodes[b].aabb) {
             if tlas.tlas_nodes[a].is_leaf() && tlas.tlas_nodes[b].is_leaf() {
                 // At leaf nodes. Perform collision tests on leaf node contents
@@ -136,7 +136,7 @@ pub fn broadphase_system_bvh(tlas: Res<Tlas>, mut broad_contacts: EventWriter<Br
                     a: tlas.blas[tlas.tlas_nodes[a].blas as usize].entity,
                     b: tlas.blas[tlas.tlas_nodes[b].blas as usize].entity,
                 });
-                info!("broad contact a: {}, b: {}", a, b);
+                //info!("broad contact a: {}, b: {}", a, b);
                 // Could have an exit rule here (eg. exit on first hit)
 
             } else {

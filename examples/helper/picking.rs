@@ -1,5 +1,5 @@
-use bevy::prelude::*;
-use bevy_inspector_egui::prelude::*;
+use bevy::{prelude::*, pbr::NotShadowCaster};
+use bevy_inspector_egui::{prelude::*, bevy_egui::EguiContext};
 use sly_physics::prelude::*;
 
 use super::Keep;
@@ -49,6 +49,7 @@ fn setup_cursor(
             ..default()
         })
         .insert(Cursor)
+        .insert(NotShadowCaster)
         .insert(Keep)
         .insert(Name::new("Cursor"));
 }
@@ -59,10 +60,14 @@ fn cursor_system(
     mut cusror_query: Query<(&mut Transform, &mut Visibility), With<Cursor>>,
     tlas: Res<Tlas>,
     mouse_input: Res<Input<MouseButton>>,
+    mut egui_context: ResMut<EguiContext>,
     mut inspector: ResMut<Inspector>,
 ) {
     let (camera, camera_transform) = camera_query.single();
     let window = windows.primary();
+    if egui_context.ctx_mut().wants_pointer_input() {
+        return;
+    }
     if let Some(mouse_pos) = window.cursor_position() {
         let (mut cursor_trans, mut cursor_vis) = cusror_query.single_mut();
         // create a ray

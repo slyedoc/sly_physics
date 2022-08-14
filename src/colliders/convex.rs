@@ -1,94 +1,119 @@
-use bevy::{prelude::*, render::mesh::{PrimitiveTopology, Indices}};
+use bevy::{
+    prelude::*,
+    render::mesh::{Indices, PrimitiveTopology},
+};
 
 use crate::types::Aabb;
 
-use super::ColliderTrait;
+use super::{fastest_linear_speed, find_support_point, ColliderTrait};
 
 #[derive(Debug)]
-pub struct ConvexCollider { 
-    pub verts: Vec<Vec3>
+pub struct ConvexCollider {
+    verts: Vec<Vec3>,
+    tris: Vec<TriIndexed>,
+    bounds: Aabb,
+    center_of_mass: Vec3,
+    inertia_tensor: Mat3,
 }
 
 impl ConvexCollider {
     pub fn new(verts: &[Vec3]) -> Self {
+        let (hull_pts, hull_tris) = build_convex_hull(&verts);
+        let bounds = Aabb::from_points(&hull_pts);
+        let centre_of_mass = calculate_center_of_mass(&hull_pts, &hull_tris);
+        let inertia_tensor = calculate_inertia_tensor(&hull_pts, &hull_tris, centre_of_mass);
+
         ConvexCollider {
-            verts: verts.to_vec()
+            verts: hull_pts,
+            tris: hull_tris,
+            bounds,
+            center_of_mass: centre_of_mass,
+            inertia_tensor,
         }
+    }
+}
+
+impl From<&ConvexCollider> for Mesh {
+    fn from(collider: &ConvexCollider) -> Self {
+        // calculate smoothed normals
+        // TODO: Could use map?
+        let mut normals: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len());
+        for i in 0..collider.verts.len() as u32 {
+            // TODO: Could use sum?
+            let mut n = Vec3::ZERO;
+            for tri in &collider.tris {
+                if i != tri.a && i != tri.b && i != tri.c {
+                    continue;
+                }
+
+                let a = collider.verts[tri.a as usize];
+                let b = collider.verts[tri.b as usize];
+                let c = collider.verts[tri.c as usize];
+
+                let ab = b - a;
+                let ac = c - a;
+                n += ab.cross(ac);
+            }
+
+            normals.push(n.normalize().into());
+        }
+
+        // TODO: Could add `From<&Vec3>` to help here or `to_array`
+        let positions: Vec<[f32; 3]> = collider.verts.iter().map(|pt| (*pt).into()).collect();
+
+        // TODO: Could use flat_map?
+        let mut indices = Vec::with_capacity(collider.tris.len() * 3);
+        for tri in &collider.tris {
+            indices.push(tri.a);
+            indices.push(tri.b);
+            indices.push(tri.c);
+        }
+
+        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+        mesh.set_indices(Some(Indices::U32(indices)));
+
+        // fake some UVs for the default shader
+        let uvs: Vec<[f32; 2]> = std::iter::repeat([0.0; 2])
+            .take(collider.verts.len())
+            .collect();
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+
+        mesh
     }
 }
 
 impl ColliderTrait for ConvexCollider {
     fn get_center_of_mass(&self) -> Vec3 {
-        todo!()
+        self.center_of_mass
     }
 
     fn get_inertia_tensor(&self) -> Mat3 {
-        todo!()
+        self.inertia_tensor
     }
 
     fn get_aabb(&self) -> Aabb {
-        todo!()
+        self.bounds
     }
 
-    fn get_support(&self, trans: &Transform, dir: Vec3, bias: f32) -> Vec3 {
-        todo!()
+    fn get_world_aabb(&self, trans: &Transform) -> Aabb {
+        let mut aabb = Aabb::default();
+        for pt in &self.verts {
+            let pt = (trans.rotation * *pt) + trans.translation;
+            aabb.expand_by_point(pt);
+        }
+        aabb
     }
 
     fn fastest_linear_speed(&self, angular_velocity: Vec3, dir: Vec3) -> f32 {
-        todo!()
+        fastest_linear_speed(&self.verts, angular_velocity, self.center_of_mass, dir)
+    }
+
+    fn get_support(&self, trans: &Transform, dir: Vec3, bias: f32) -> Vec3 {
+        find_support_point(&self.verts, dir, trans.translation, trans.rotation, bias)
     }
 }
-
-pub fn create_convex_mesh_from_verts(verts: &[Vec3]) -> Mesh {
-
-    let (hull_pts, hull_tris) = build_convex_hull(&verts);
-    
-    // calculate smoothed normals
-    // TODO: Could use map?
-    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(hull_pts.len());
-    for i in 0..hull_pts.len() as u32 {
-        // TODO: Could use sum?
-        let mut n = Vec3::ZERO;
-        for tri in &hull_tris {
-            if i != tri.a && i != tri.b && i != tri.c {
-                continue;
-            }
-
-            let a = hull_pts[tri.a as usize];
-            let b = hull_pts[tri.b as usize];
-            let c = hull_pts[tri.c as usize];
-
-            let ab = b - a;
-            let ac = c - a;
-            n += ab.cross(ac);
-        }
-
-        normals.push(n.normalize().into());
-    }
-
-    // TODO: Could add `From<&Vec3>` to help here or `to_array`
-    let positions: Vec<[f32; 3]> = hull_pts.iter().map(|pt| (*pt).into()).collect();
-
-    // TODO: Could use flat_map?
-    let mut indices = Vec::with_capacity(hull_tris.len() * 3);
-    for tri in hull_tris {
-        indices.push(tri.a);
-        indices.push(tri.b);
-        indices.push(tri.c);
-    }
-
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.set_indices(Some(Indices::U32(indices)));
-
-    // fake some UVs for the default shader
-    let uvs: Vec<[f32; 2]> = std::iter::repeat([0.0; 2]).take(hull_pts.len()).collect();
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-
-    mesh
-}
-
 
 pub fn calculate_center_of_mass(pts: &[Vec3], tris: &[TriIndexed]) -> Vec3 {
     const NUM_SAMPLES: usize = 100;
@@ -120,7 +145,6 @@ pub fn calculate_center_of_mass(pts: &[Vec3], tris: &[TriIndexed]) -> Vec3 {
     cm / sample_count as f32
 }
 
-
 fn is_external(pts: &[Vec3], tris: &[TriIndexed], pt: Vec3) -> bool {
     for tri in tris {
         let a = pts[tri.a as usize];
@@ -137,7 +161,7 @@ fn is_external(pts: &[Vec3], tris: &[TriIndexed], pt: Vec3) -> bool {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct  TriIndexed {
+pub struct TriIndexed {
     pub a: u32,
     pub b: u32,
     pub c: u32,
@@ -157,11 +181,10 @@ impl PartialEq for Edge {
 
 impl Eq for Edge {}
 
-pub fn build_convex_hull(verts: &[Vec3]) -> (Vec<Vec3>, Vec<TriIndexed>) {
-    
+fn build_convex_hull(verts: &[Vec3]) -> (Vec<Vec3>, Vec<TriIndexed>) {
     let mut hull_points = Vec::new();
     let mut hull_tris = Vec::new();
-    
+
     assert!(verts.len() > 3);
 
     build_tetrahedron(verts, &mut hull_points, &mut hull_tris);
@@ -170,7 +193,6 @@ pub fn build_convex_hull(verts: &[Vec3]) -> (Vec<Vec3>, Vec<TriIndexed>) {
 
     (hull_points, hull_tris)
 }
-
 
 fn build_tetrahedron(verts: &[Vec3], hull_points: &mut Vec<Vec3>, hull_tris: &mut Vec<TriIndexed>) {
     hull_points.clear();
@@ -196,7 +218,6 @@ fn build_tetrahedron(verts: &[Vec3], hull_points: &mut Vec<Vec3>, hull_tris: &mu
         TriIndexed { a: 1, b: 0, c: 3 },
     ]);
 }
-
 
 pub fn calculate_inertia_tensor(pts: &[Vec3], tris: &[TriIndexed], cm: Vec3) -> Mat3 {
     const NUM_SAMPLES: usize = 100;
@@ -303,7 +324,11 @@ fn find_point_furthest_from_triangle(pts: &[Vec3], a: Vec3, b: Vec3, c: Vec3) ->
     pts[max_idx]
 }
 
-fn expand_convex_hull(hull_points: &mut Vec<Vec3>, hull_tris: &mut Vec<TriIndexed>, verts: &[Vec3]) {
+fn expand_convex_hull(
+    hull_points: &mut Vec<Vec3>,
+    hull_tris: &mut Vec<TriIndexed>,
+    verts: &[Vec3],
+) {
     let mut external_verts = Vec::from(verts);
     remove_internal_points(hull_points, hull_tris, &mut external_verts);
 
@@ -324,7 +349,11 @@ fn expand_convex_hull(hull_points: &mut Vec<Vec3>, hull_tris: &mut Vec<TriIndexe
     remove_unreferenced_verts(hull_points, hull_tris);
 }
 
-fn remove_internal_points(hull_points: &[Vec3], hull_tris: &[TriIndexed], check_pts: &mut Vec<Vec3>) {
+fn remove_internal_points(
+    hull_points: &[Vec3],
+    hull_tris: &[TriIndexed],
+    check_pts: &mut Vec<Vec3>,
+) {
     // for i in 0..check_pts.len() {
     let mut i = 0;
     while i < check_pts.len() {

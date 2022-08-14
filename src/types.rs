@@ -235,7 +235,7 @@ pub struct CenterOfMassWorld(pub Vec3);
 pub struct InverseInertiaTensorWorld(pub Mat3);
 
 
-#[derive(Debug, Component, Inspectable, Copy, Clone)]
+#[derive(Debug, Inspectable, Copy, Clone)]
 pub struct Aabb {
     pub mins: Vec3,
     pub maxs: Vec3,
@@ -315,10 +315,6 @@ impl Aabb {
         true
     }
 
-    pub fn clear(&mut self) {
-        *self = Aabb::default();
-    }
-
     // TODO: preformance test form_points vs grow vs add_assign vs expand_by_point, all doing same thing
     pub fn from_points(pts: &[Vec3]) -> Self {
         pts.iter().fold(Aabb::default(), |acc, pt| acc + *pt)
@@ -339,26 +335,7 @@ impl Aabb {
         e.x * e.y + e.y * e.z + e.z * e.x
     }
 
-    pub fn get_world_aabb(&self, trans: &Transform) -> AabbWorld {
-        let corners = [
-            Vec3::new(self.mins.x, self.mins.y, self.mins.z),
-            Vec3::new(self.mins.x, self.mins.y, self.maxs.z),
-            Vec3::new(self.mins.x, self.maxs.y, self.mins.z),
-            Vec3::new(self.maxs.x, self.mins.y, self.mins.z),
-            Vec3::new(self.maxs.x, self.maxs.y, self.maxs.z),
-            Vec3::new(self.maxs.x, self.maxs.y, self.mins.z),
-            Vec3::new(self.maxs.x, self.mins.y, self.maxs.z),
-            Vec3::new(self.mins.x, self.maxs.y, self.maxs.z),
-        ];
 
-        let mut aabb = Aabb::default();
-        for pt in &corners {
-            let pt = (trans.rotation * *pt) + trans.translation;
-            aabb.expand_by_point(pt);
-        }
-
-        AabbWorld(aabb)
-    }
 
     pub fn expand_by_point(&mut self, rhs: Vec3) {
         self.mins = Vec3::select(rhs.cmplt(self.mins), rhs, self.mins);

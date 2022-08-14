@@ -4,17 +4,13 @@ use bevy::{
 };
 use sly_physics::prelude::*;
 
-pub struct SphereId {
-    pub index: usize,
-}
-
 #[test]
 fn did_sphere_fall() {
     // Setup app
     let mut app = App::new();
     app.add_plugin(PhysicsPlugin);
 
-    app.add_system(spawn_ground);
+    app.add_startup_system(spawn_ground);
 
     let mut collider_resources = app.world.get_resource_mut::<ColliderResources>().unwrap();
     let sphere_collider = collider_resources.add_sphere(0.5);

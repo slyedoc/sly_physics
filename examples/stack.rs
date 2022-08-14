@@ -16,6 +16,7 @@ fn main() {
         .add_plugin(WorldInspectorPlugin::default())
         // our phsycis plugin
         .add_plugin(PhysicsPlugin)
+        .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
         .add_plugin(PhysicsBvhCameraPlugin)
         // local setup stuff
@@ -52,11 +53,11 @@ pub enum StackMode {
 impl Default for Stack {
     fn default() -> Self {
         Self {
-            count: (2u32, 2u32, 3u32),
-            spacing: 1.2,
+            count: (10u32, 3u32, 3u32),
+            spacing: 1.0,
             time_scale: 1.0,
-            mode: StackMode::Box,
-            ball_velocity: 0.0,
+            mode: StackMode::Sphere,
+            ball_velocity: 30.0,
         }
     }
 }
@@ -138,4 +139,60 @@ pub fn setup(
             ..default()
         })
         .insert(Name::new("Wreaking Ball"));
+
+    // Diamond
+
+    let diamond = make_diamond_convex_shape();
+
+    let diamond_collider_index = collider_resources.add_convex(&diamond);
+    let diamond_collider = collider_resources.get_convex(diamond_collider_index.index());
+
+    commands
+        .spawn_bundle(PbrBundle {
+            transform: Transform::from_xyz(30.0, wreak_ball_radius + 1.0, 0.0),
+            mesh: meshes.add(Mesh::from(diamond_collider.clone())),
+            material: materials.add(StandardMaterial {
+                base_color: Color::rgb(0.0, 0.0, 1.0),
+                ..default()
+            }),
+            ..default()
+        })
+        .insert_bundle(RigidBodyBundle {
+            collider: diamond_collider_index,
+            mass: Mass(2.0),
+            ..default()
+        })
+        .insert(Name::new("Diamond"));
+}
+
+fn make_diamond_convex_shape() -> Vec<Vec3> {
+    let mut diamond = [Vec3::ZERO; 7 * 8];
+    let quat_half = Quat::from_rotation_y(2.0 * std::f32::consts::PI * 0.125 * 0.5);
+    let mut pts = [Vec3::ZERO; 7];
+    pts[0] = Vec3::new(0.1, -1.0, 0.0);
+    pts[1] = Vec3::new(1.0, 0.0, 0.0);
+    pts[2] = Vec3::new(1.0, 0.1, 0.0);
+    pts[3] = Vec3::new(0.4, 0.4, 0.0);
+    pts[4] = Vec3::new(0.8, 0.3, 0.0);
+    pts[4] = quat_half * pts[4];
+    pts[5] = quat_half * pts[1];
+    pts[6] = quat_half * pts[2];
+
+    let quat = Quat::from_rotation_y(2.0 * std::f32::consts::PI * 0.125);
+    let mut idx = 0;
+    for pt in &pts {
+        diamond[idx] = *pt;
+        idx += 1;
+    }
+
+    let mut quat_acc = Quat::IDENTITY;
+    for _ in 1..8 {
+        quat_acc *= quat;
+        for pt in &pts {
+            diamond[idx] = quat_acc * *pt;
+            idx += 1;
+        }
+    }
+
+    diamond.to_vec()
 }
