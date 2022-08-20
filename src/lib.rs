@@ -117,7 +117,7 @@ pub struct PhysicsPlugin;
 
 impl Plugin for PhysicsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_loopless_state(PhysicsState::Running)
+        app.add_loopless_state(PhysicsState::Paused)
             .add_event::<BroadContact>()
             .add_event::<Contact>()
             .init_resource::<PhysicsConfig>()
@@ -294,6 +294,7 @@ fn register_inspectable_system(mut registry: ResMut<InspectableRegistry>) {
 }
 
 // Note: Assuming meshes are loaded
+#[allow(clippy::type_complexity)]
 pub fn spawn(
     mut commands: Commands,
     mut query: Query<

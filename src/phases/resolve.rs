@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::*;
 
+#[allow(clippy::type_complexity)]
 pub fn resolve_system(
     mut contacts_events: EventReader<Contact>,
     mut query: Query<(
@@ -40,6 +41,7 @@ pub fn resolve_system(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn step_rigibbodies(
     query: &mut Query<(
         &mut Transform,
@@ -56,7 +58,7 @@ fn step_rigibbodies(
 ) {
     for (
         mut transform,
-        mut linear_vel,
+        linear_vel,
         mut ang_vel,
         _inv_mass,
         _elas,
@@ -69,7 +71,7 @@ fn step_rigibbodies(
         RBHelper::update(
             &mut transform,
             &mut ang_vel,
-            &mut linear_vel,
+            &linear_vel,
             com,
             inertia_tensor,
             time,
@@ -77,6 +79,7 @@ fn step_rigibbodies(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn resolve_contact(
     query: &mut Query<(
         &mut Transform,

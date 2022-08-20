@@ -43,6 +43,7 @@ path = "examples/main.rs"
 name = "stack"
 path = "examples/stack.rs"
 
+
 [[bench]]
 name = "stack"
 harness = false

@@ -21,7 +21,7 @@ pub struct ConvexCollider {
 
 impl ConvexCollider {
     pub fn new(verts: &[Vec3]) -> Self {
-        let (hull_pts, hull_tris) = build_convex_hull(&verts);
+        let (hull_pts, hull_tris) = build_convex_hull(verts);
         let bounds = Aabb::from_points(&hull_pts);
         let centre_of_mass = calculate_center_of_mass(&hull_pts, &hull_tris);
         let inertia_tensor = calculate_inertia_tensor(&hull_pts, &hull_tris, centre_of_mass);

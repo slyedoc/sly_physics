@@ -96,6 +96,7 @@ impl Constraint {
         q_dt
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn apply_impulses(
         // A
         trans_a: &Transform,

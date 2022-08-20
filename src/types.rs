@@ -54,6 +54,7 @@ impl RBHelper {
         t.translation + t.rotation * com.0
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn apply_impulse(
         trans: &Transform,
         linear_velocity: &mut LinearVelocity,

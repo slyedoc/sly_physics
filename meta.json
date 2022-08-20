@@ -1,0 +1,221 @@
+{
+    "packages": [
+        {
+            "name": "sly_physics",
+            "version": "0.1.0",
+            "id": "sly_physics 0.1.0 (path+file:///home/slyedoc/Code/sly_physics)",
+            "license": "MIT OR Apache-2.0",
+            "license_file": null,
+            "description": "A native physics engine for Bevy",
+            "source": null,
+            "dependencies": [
+                {
+                    "name": "bevy",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^0.8.0",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "bevy-inspector-egui",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^0.12.1",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "iyes_loopless",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^0.7.0",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "bevy-inspector-egui",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^0.12.1",
+                    "kind": "dev",
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "criterion",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^0.3",
+                    "kind": "dev",
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [
+                        "html_reports"
+                    ],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "image",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^0.24.2",
+                    "kind": "dev",
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "sly_camera_controller",
+                    "source": "git+https://github.com/slyedoc/sly_camera_controller?branch=main",
+                    "req": "*",
+                    "kind": "dev",
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                }
+            ],
+            "targets": [
+                {
+                    "kind": [
+                        "lib"
+                    ],
+                    "crate_types": [
+                        "lib"
+                    ],
+                    "name": "sly_physics",
+                    "src_path": "/home/slyedoc/Code/sly_physics/src/lib.rs",
+                    "edition": "2021",
+                    "doc": true,
+                    "doctest": true,
+                    "test": true
+                },
+                {
+                    "kind": [
+                        "example"
+                    ],
+                    "crate_types": [
+                        "bin"
+                    ],
+                    "name": "main",
+                    "src_path": "/home/slyedoc/Code/sly_physics/examples/main.rs",
+                    "edition": "2021",
+                    "doc": false,
+                    "doctest": false,
+                    "test": false
+                },
+                {
+                    "kind": [
+                        "example"
+                    ],
+                    "crate_types": [
+                        "bin"
+                    ],
+                    "name": "stack",
+                    "src_path": "/home/slyedoc/Code/sly_physics/examples/stack.rs",
+                    "edition": "2021",
+                    "doc": false,
+                    "doctest": false,
+                    "test": false
+                },
+                {
+                    "kind": [
+                        "example"
+                    ],
+                    "crate_types": [
+                        "bin"
+                    ],
+                    "name": "gravity",
+                    "src_path": "/home/slyedoc/Code/sly_physics/examples/gravity.rs",
+                    "edition": "2021",
+                    "doc": false,
+                    "doctest": false,
+                    "test": false
+                },
+                {
+                    "kind": [
+                        "test"
+                    ],
+                    "crate_types": [
+                        "bin"
+                    ],
+                    "name": "sphere",
+                    "src_path": "/home/slyedoc/Code/sly_physics/tests/sphere.rs",
+                    "edition": "2021",
+                    "doc": false,
+                    "doctest": false,
+                    "test": true
+                },
+                {
+                    "kind": [
+                        "bench"
+                    ],
+                    "crate_types": [
+                        "bin"
+                    ],
+                    "name": "stack",
+                    "src_path": "/home/slyedoc/Code/sly_physics/benches/stack.rs",
+                    "edition": "2021",
+                    "doc": false,
+                    "doctest": false,
+                    "test": false
+                }
+            ],
+            "features": {
+                "continuous": [],
+                "default": [
+                    "continuous"
+                ],
+                "discrete": [],
+                "step": [],
+                "trace": [
+                    "bevy/trace",
+                    "bevy/trace_chrome"
+                ]
+            },
+            "manifest_path": "/home/slyedoc/Code/sly_physics/Cargo.toml",
+            "metadata": null,
+            "publish": null,
+            "authors": [],
+            "categories": [],
+            "keywords": [],
+            "readme": "README.md",
+            "repository": "https://github.com/slyedoc/sly_physics",
+            "homepage": null,
+            "documentation": null,
+            "edition": "2021",
+            "links": null,
+            "default_run": null,
+            "rust_version": null
+        }
+    ],
+    "workspace_members": [
+        "sly_physics 0.1.0 (path+file:///home/slyedoc/Code/sly_physics)"
+    ],
+    "resolve": null,
+    "target_directory": "/home/slyedoc/Code/sly_physics/target",
+    "version": 1,
+    "workspace_root": "/home/slyedoc/Code/sly_physics",
+    "metadata": null
+}

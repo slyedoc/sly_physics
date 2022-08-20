@@ -107,13 +107,13 @@ pub fn narrow_system(
                 let cube_a = collider_resources.get_cube(*box_a_index);
                 let cube_b = collider_resources.get_cube(*box_b_index);
                 conservative_advancement::<BoxCollider, BoxCollider>(
-                    &cube_a,
+                    cube_a,
                     &mut trans_a,
                     &mut ang_vel_a,
                     lin_vel_a,
                     com_a,
                     i_tensor_a,
-                    &cube_b,
+                    cube_b,
                     &mut trans_b,
                     &mut ang_vel_b,
                     lin_vel_b,
@@ -127,13 +127,13 @@ pub fn narrow_system(
                 let sphere_a = collider_resources.get_sphere(*sphere_index);
                 let cube = collider_resources.get_cube(*box_index);
                 conservative_advancement::<SphereCollider, BoxCollider>(
-                    &sphere_a,
+                    sphere_a,
                     &mut trans_a,
                     &mut ang_vel_a,
                     lin_vel_a,
                     com_a,
                     i_tensor_a,
-                    &cube,
+                    cube,
                     &mut trans_b,
                     &mut ang_vel_b,
                     lin_vel_b,
@@ -147,13 +147,13 @@ pub fn narrow_system(
                 let sphere = collider_resources.get_sphere(*sphere_index);
                 let cube = collider_resources.get_cube(*cube_index);
                 conservative_advancement::<BoxCollider, SphereCollider>(
-                    &cube,
+                    cube,
                     &mut trans_a,
                     &mut ang_vel_a,
                     lin_vel_a,
                     com_a,
                     i_tensor_a,
-                    &sphere,
+                    sphere,
                     &mut trans_b,
                     &mut ang_vel_b,
                     lin_vel_b,
@@ -167,13 +167,13 @@ pub fn narrow_system(
                 let sphere = collider_resources.get_sphere(*sphere_index);
                 let convex = collider_resources.get_convex(*convex_index);
                 conservative_advancement::<SphereCollider, ConvexCollider>(
-                    &sphere,
+                    sphere,
                     &mut trans_a,
                     &mut ang_vel_a,
                     lin_vel_a,
                     com_a,
                     i_tensor_a,
-                    &convex,
+                    convex,
                     &mut trans_b,
                     &mut ang_vel_b,
                     lin_vel_b,
@@ -187,13 +187,13 @@ pub fn narrow_system(
                 let cube = collider_resources.get_cube(*cube_index);
                 let convex = collider_resources.get_convex(*convex_index);
                 conservative_advancement::<BoxCollider, ConvexCollider>(
-                    &cube,
+                    cube,
                     &mut trans_a,
                     &mut ang_vel_a,
                     lin_vel_a,
                     com_a,
                     i_tensor_a,
-                    &convex,
+                    convex,
                     &mut trans_b,
                     &mut ang_vel_b,
                     lin_vel_b,
@@ -207,13 +207,13 @@ pub fn narrow_system(
                 let convex = collider_resources.get_convex(*convex_index);
                 let sphere = collider_resources.get_sphere(*sphere_index);
                 conservative_advancement::<ConvexCollider, SphereCollider>(
-                    &convex,
+                    convex,
                     &mut trans_a,
                     &mut ang_vel_a,
                     lin_vel_a,
                     com_a,
                     i_tensor_a,
-                    &sphere,
+                    sphere,
                     &mut trans_b,
                     &mut ang_vel_b,
                     lin_vel_b,
@@ -227,13 +227,13 @@ pub fn narrow_system(
                 let convex = collider_resources.get_convex(*convex_index);
                 let cube = collider_resources.get_cube(*cube_index);
                 conservative_advancement::<ConvexCollider, BoxCollider>(
-                    &convex,
+                    convex,
                     &mut trans_a,
                     &mut ang_vel_a,
                     lin_vel_a,
                     com_a,
                     i_tensor_a,
-                    &cube,
+                    cube,
                     &mut trans_b,
                     &mut ang_vel_b,
                     lin_vel_b,
@@ -247,13 +247,13 @@ pub fn narrow_system(
                 let convex_a = collider_resources.get_convex(*convex_index_a);
                 let convex_b = collider_resources.get_convex(*convex_index_b);
                 conservative_advancement::<ConvexCollider, ConvexCollider>(
-                    &convex_a,
+                    convex_a,
                     &mut trans_a,
                     &mut ang_vel_a,
                     lin_vel_a,
                     com_a,
                     i_tensor_a,
-                    &convex_b,
+                    convex_b,
                     &mut trans_b,
                     &mut ang_vel_b,
                     lin_vel_b,
@@ -274,6 +274,7 @@ pub fn narrow_system(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
     // Shape A
     shape_a: &T,
@@ -302,7 +303,7 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
         const BIAS: f32 = 0.001;
 
         if let Some((mut world_point_a, mut world_point_b)) =
-            gjk_does_intersect::<T, K>(&shape_a, &trans_a, &shape_b, &trans_b, BIAS)
+            gjk_does_intersect::<T, K>(shape_a, trans_a, shape_b, trans_b, BIAS)
         {
             let normal = (world_point_b - world_point_a).normalize_or_zero();
             world_point_a -= normal * BIAS;
@@ -313,8 +314,8 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
                 b: pair.b,
                 world_point_a,
                 world_point_b,
-                local_point_a: RBHelper::world_to_local(&trans_a, com_a, world_point_a),
-                local_point_b: RBHelper::world_to_local(&trans_b, com_b, world_point_b),
+                local_point_a: RBHelper::world_to_local(trans_a, com_a, world_point_a),
+                local_point_b: RBHelper::world_to_local(trans_b, com_b, world_point_b),
                 normal,
                 separation_dist: -(world_point_a - world_point_b).length(),
                 time_of_impact: toi,
@@ -329,7 +330,7 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
 
         // advance based on closest point
         let (world_point_a, world_point_b) =
-            gjk_closest_points::<T, K>(&shape_a, &trans_a, &shape_b, &trans_b);
+            gjk_closest_points::<T, K>(shape_a, trans_a, shape_b, trans_b);
         let separation_dist = (world_point_a - world_point_b).length();
 
         // get the vector from the closest point on A to the closest point on B

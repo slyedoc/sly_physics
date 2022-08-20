@@ -7,21 +7,168 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Cargo launch",
+            "name": "Debug unit tests in library 'sly_physics'",
             "cargo": {
                 "args": [
-                    "build",
-                    "--lib"
-                ]
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=sly_physics"
+                ],
+                "filter": {
+                    "name": "sly_physics",
+                    "kind": "lib"
+                }
             },
-            "program": "${cargo:program}",
-            "args": []
+            "args": [],
+            "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
-            "program": "${workspaceFolder}/<executable file>",
+            "name": "Debug example 'main'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=main",
+                    "--package=sly_physics"
+                ],
+                "filter": {
+                    "name": "main",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'main'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=main",
+                    "--package=sly_physics"
+                ],
+                "filter": {
+                    "name": "main",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'stack'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=stack",
+                    "--package=sly_physics"
+                ],
+                "filter": {
+                    "name": "stack",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'stack'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=stack",
+                    "--package=sly_physics"
+                ],
+                "filter": {
+                    "name": "stack",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'gravity'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=gravity",
+                    "--package=sly_physics"
+                ],
+                "filter": {
+                    "name": "gravity",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'gravity'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=gravity",
+                    "--package=sly_physics"
+                ],
+                "filter": {
+                    "name": "gravity",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'sphere'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=sphere",
+                    "--package=sly_physics"
+                ],
+                "filter": {
+                    "name": "sphere",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'stack'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=stack",
+                    "--package=sly_physics"
+                ],
+                "filter": {
+                    "name": "stack",
+                    "kind": "bench"
+                }
+            },
             "args": [],
             "cwd": "${workspaceFolder}"
         }

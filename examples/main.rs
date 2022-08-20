@@ -1,4 +1,4 @@
-use bevy::{prelude::*, window::PresentMode};
+use bevy::{math::vec3, prelude::*, window::PresentMode};
 use bevy_inspector_egui::prelude::*;
 use helper::{AppState, HelperPlugin};
 use iyes_loopless::prelude::*;
@@ -13,15 +13,16 @@ fn main() {
             ..default()
         })
         .add_plugins(DefaultPlugins)
-        .add_plugin(HelperPlugin)
+
         .add_plugin(WorldInspectorPlugin::default())
-        .add_plugin(CameraControllerPlugin)
         // our phsycis plugin
         .add_plugin(PhysicsPlugin)
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
         .add_plugin(PhysicsBvhCameraPlugin)
-
+        
+        .add_plugin(HelperPlugin)
+        .add_plugin(CameraControllerPlugin)
         .add_startup_system(helper::setup_camera)
         .add_enter_system(AppState::Playing, helper::setup_room)
         .add_enter_system(AppState::Playing, setup)
@@ -32,29 +33,45 @@ pub fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    asset_server: Res<AssetServer>,
     mut collider_resources: ResMut<ColliderResources>,
+    asset_server: Res<AssetServer>,
 ) {
-    let radius = 1.0;
+    let box_a = collider_resources.add_box(Vec3::ONE);
+    let box_mesh = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
+    let box_mat = materials.add(StandardMaterial {
+        base_color_texture: Some(asset_server.load("checker_red.png")),
+        ..default()
+    });
+
     commands
         .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::UVSphere {
-                radius,
+            mesh: box_mesh.clone(),
+            material: box_mat.clone(),
+            transform: Transform {
+                translation: vec3(8.00000667, 9.4973526, 2.5000124),
+                rotation: Quat::from_xyzw(-1.19166614E-7, -0.00000143082571, 0.00000248814399, 1.0),
                 ..default()
-            })),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("checker_red.png")),
-
-                ..default()
-            }),
-            transform: Transform::from_translation(Vec3::Y * 4.0),
+            },
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
-            collider: collider_resources.add_sphere(radius),
-            mode: RigidBodyMode::Dynamic,
-            elasticity: Elasticity(1.0),
+            collider: box_a.clone(),
+            ..default()
+        });
+
+    commands
+        .spawn_bundle(PbrBundle {
+            transform: Transform {
+                translation: vec3(8.00001144, 8.49734306, 3.50001287),
+                rotation: Quat::from_xyzw(9.16530154E-7, 5.70654834E-7, 0.00000295896189, 1.0),
+                ..default()
+            },
+            mesh: box_mesh.clone(),
+            material: box_mat.clone(),
             ..default()
         })
-        .insert(Name::new("Sphere A"));
+        .insert_bundle(RigidBodyBundle {
+            collider: box_a,
+            ..default()
+        });
 }

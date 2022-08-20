@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{math::Mat4Ext, colliders::ColliderTrait};
+use crate::{math::Mat4Ext, colliders::{ColliderTrait}};
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 struct Point {
@@ -136,6 +136,8 @@ pub fn gjk_does_intersect<T: ColliderTrait, K: ColliderTrait>(collider_a: &T, tr
      Some(epa_expand(collider_a, trans_a, collider_b, trans_b, bias, &simplex_points))
  }
  
+
+
 fn epa_expand(
     collider_a: &impl ColliderTrait,
     trans_a: &Transform, 
@@ -173,8 +175,10 @@ fn epa_expand(
         triangles.push(tri);
     }
 
+
     // Expand the simplex to find the closest face of the CSO to the origin
     loop {
+
         let tri = closest_triangle(&triangles, &points).unwrap();
         let normal = normal_direction(&tri, &points);
 
@@ -226,6 +230,10 @@ fn epa_expand(
     }
 
     // Get the projection of the origin on the closest triangle
+    //let closest = closest_triangle(&triangles, &points);
+    // if closest.is_none() {
+    //      info!("No closest triangle found");
+    // }
     let tri = closest_triangle(&triangles, &points).unwrap();
     let pt_a = &points[tri.a as usize];
     let pt_b = &points[tri.b as usize];

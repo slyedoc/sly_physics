@@ -119,7 +119,7 @@ fn cmp_z_axis(a: &(Entity, AabbWorld, Option<&Static>), b: &(Entity, AabbWorld, 
 }
 
 
-// TODO: The we should be able to traverse the bvh tree, 'tlas' in our case, for collision detection
+// TODO: The we should be able to traverse the bvh tree, 'tlas' in our case, for possable collision detection
 // This was as the one of the main reason i added bvh
 // I am missing something here, and this is broken
 #[allow(dead_code)]
@@ -139,17 +139,16 @@ pub fn broadphase_system_bvh(tlas: Res<Tlas>, mut broad_contacts: EventWriter<Br
                 //info!("broad contact a: {}, b: {}", a, b);
                 // Could have an exit rule here (eg. exit on first hit)
 
-            } else {
-                if !tlas.tlas_nodes[a].is_leaf() { // ‘Descend A’ descent rule
+            } else if !tlas.tlas_nodes[a].is_leaf() { // ‘Descend A’ descent rule
                     stack.push((tlas.tlas_nodes[a].right(), b));
                     a = tlas.tlas_nodes[a].left();
                     continue;
-                } else {
-                    stack.push((a, tlas.tlas_nodes[b].right()));
-                    b = tlas.tlas_nodes[b].left();
-                    continue;
-                }
+            } else {
+                stack.push((a, tlas.tlas_nodes[b].right()));
+                b = tlas.tlas_nodes[b].left();
+                continue;
             }
+            
         }
         if let Some((new_a, new_b)) = stack.pop() {
             a = new_a;

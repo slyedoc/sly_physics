@@ -45,11 +45,6 @@ pub fn setup_camera(mut commands: Commands) {
             ..default()
         })
         .insert(Keep);
-
-    // cameras
-    // commands
-    //     .spawn_bundle(Camera2dBundle::default())
-    //     .insert(Keep);
         
     commands
         .spawn_bundle(Camera3dBundle {

@@ -164,7 +164,7 @@ pub fn render_image(
         camera.ui_id = Some(id);
     }
 
-    camera.update(&trans);
+    camera.update(trans);
 
     if let Some(image) = &camera.image {
         let image = images.get_mut(image).unwrap();

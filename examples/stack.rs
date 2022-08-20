@@ -47,17 +47,17 @@ pub struct Stack {
 #[derive(Inspectable)]
 pub enum StackMode {
     Sphere,
-    Box,
+    Cube,
 }
 
 impl Default for Stack {
     fn default() -> Self {
         Self {
-            count: (10u32, 3u32, 3u32),
+            count: (5, 5, 5),
             spacing: 1.0,
             time_scale: 1.0,
-            mode: StackMode::Sphere,
-            ball_velocity: 30.0,
+            mode: StackMode::Cube,
+            ball_velocity: 60.0,
         }
     }
 }
@@ -76,7 +76,7 @@ pub fn setup(
 
     let collider = match stack.mode {
         StackMode::Sphere => collider_resources.add_sphere(radius),
-        StackMode::Box => collider_resources.add_box(Vec3::splat(1.0)),
+        StackMode::Cube => collider_resources.add_box(Vec3::splat(1.0)),
     };
 
     for i in 0..size.0 {
@@ -94,7 +94,7 @@ pub fn setup(
                                 radius,
                                 ..default()
                             })),
-                            StackMode::Box => {
+                            StackMode::Cube => {
                                 meshes.add(Mesh::from(shape::Box::new(1.0, 1.0, 1.0)))
                             }
                         },

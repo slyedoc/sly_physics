@@ -132,12 +132,11 @@ impl Manifold {
                     new_idx = Some(i);
                 }
             }
-            if new_idx.is_none() {
-                return;
+            if let Some(idx) = new_idx {                
+                self.contacts[idx] = contact;
+                idx
             } else {
-                let i = new_idx.unwrap();
-                self.contacts[i] = contact;
-                i
+                return;
             }
         } else {
             self.contacts.push(contact);
@@ -343,7 +342,7 @@ pub fn pre_solve(
 
     manifold_arena
         .manifolds
-        .retain(|_pair, manifold| manifold.contacts.len() > 0)
+        .retain(|_pair, manifold| !manifold.contacts.is_empty())
 }
 
 pub fn solve(
@@ -489,5 +488,5 @@ pub fn post_solve(
     // if there are no contacts left, remove the manifold
     manifold_arena
         .manifolds
-        .retain(|_pair, manifold| manifold.contacts.len() > 0)
+        .retain(|_pair, manifold| !manifold.contacts.is_empty())
 }
