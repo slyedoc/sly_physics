@@ -36,56 +36,98 @@ impl ConvexCollider {
     }
 }
 
+// TODO: made this flat normals for the bevy jam
 impl From<&ConvexCollider> for Mesh {
     fn from(collider: &ConvexCollider) -> Self {
-        // calculate smoothed normals
-        // TODO: Could use map?
-        let mut normals: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len());
-        for i in 0..collider.verts.len() as u32 {
-            // TODO: Could use sum?
-            let mut n = Vec3::ZERO;
-            for tri in &collider.tris {
-                if i != tri.a && i != tri.b && i != tri.c {
-                    continue;
-                }
+        let mut verts: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len() * 3);
+        let mut normals: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len() * 3);
+        let mut indices: Vec<u32> = Vec::with_capacity(collider.tris.len() * 3);
+        
+        for (i, tri) in collider.tris.iter().enumerate() {
+            let a = collider.verts[tri.a as usize];
+            verts.push(a.into());
+            let b = collider.verts[tri.b as usize];
+            verts.push(b.into());
+            let c = collider.verts[tri.c as usize];
+            verts.push(c.into());
 
-                let a = collider.verts[tri.a as usize];
-                let b = collider.verts[tri.b as usize];
-                let c = collider.verts[tri.c as usize];
+            let ab = b - a;
+            let ac = c - a;
+            let n = ab.cross(ac).normalize().into();
+            normals.push(n);
+            normals.push(n);
+            normals.push(n);
 
-                let ab = b - a;
-                let ac = c - a;
-                n += ab.cross(ac);
-            }
-
-            normals.push(n.normalize().into());
+            let offset = i as u32 * 3;
+            indices.push(offset);
+            indices.push(offset + 1);
+            indices.push(offset + 2);            
         }
 
-        // TODO: Could add `From<&Vec3>` to help here or `to_array`
-        let positions: Vec<[f32; 3]> = collider.verts.iter().map(|pt| (*pt).into()).collect();
-
-        // TODO: Could use flat_map?
-        let mut indices = Vec::with_capacity(collider.tris.len() * 3);
-        for tri in &collider.tris {
-            indices.push(tri.a);
-            indices.push(tri.b);
-            indices.push(tri.c);
-        }
-
-        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);        
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verts);                
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);        
         mesh.set_indices(Some(Indices::U32(indices)));
 
         // fake some UVs for the default shader
-        let uvs: Vec<[f32; 2]> = std::iter::repeat([0.0; 2])
-            .take(collider.verts.len())
-            .collect();
-        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-
+        // let uvs: Vec<[f32; 2]> = std::iter::repeat([0.0; 2])
+        //     .take(collider.verts.len() * 3)
+        //     .collect();
+        // mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
         mesh
     }
 }
+
+// impl From<&ConvexCollider> for Mesh {
+//     fn from(collider: &ConvexCollider) -> Self {
+//         // calculate smoothed normals
+//         // TODO: Could use map?
+//         let mut normals: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len());
+//         for i in 0..collider.verts.len() as u32 {
+//             // TODO: Could use sum?
+//             let mut n = Vec3::ZERO;
+//             for tri in &collider.tris {
+//                 if i != tri.a && i != tri.b && i != tri.c {
+//                     continue;
+//                 }
+
+//                 let a = collider.verts[tri.a as usize];
+//                 let b = collider.verts[tri.b as usize];
+//                 let c = collider.verts[tri.c as usize];
+
+//                 let ab = b - a;
+//                 let ac = c - a;
+//                 n += ab.cross(ac);
+//             }
+
+//             normals.push(n.normalize().into());
+//         }
+
+//         // TODO: Could add `From<&Vec3>` to help here or `to_array`
+//         let positions: Vec<[f32; 3]> = collider.verts.iter().map(|pt| (*pt).into()).collect();
+
+//         // TODO: Could use flat_map?
+//         let mut indices = Vec::with_capacity(collider.tris.len() * 3);
+//         for tri in &collider.tris {
+//             indices.push(tri.a);
+//             indices.push(tri.b);
+//             indices.push(tri.c);
+//         }
+
+//         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+//         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+
+//         //mesh.set_indices(Some(Indices::U32(indices)));
+
+//         // fake some UVs for the default shader
+//         let uvs: Vec<[f32; 2]> = std::iter::repeat([0.0; 2])
+//             .take(collider.verts.len())
+//             .collect();
+//         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+
+//         mesh
+//     }
+// }
 
 impl ColliderTrait for ConvexCollider {
     fn get_center_of_mass(&self) -> Vec3 {

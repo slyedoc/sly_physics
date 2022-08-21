@@ -117,7 +117,7 @@ pub struct PhysicsPlugin;
 
 impl Plugin for PhysicsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_loopless_state(PhysicsState::Paused)
+        app.add_loopless_state(PhysicsState::Running)
             .add_event::<BroadContact>()
             .add_event::<Contact>()
             .init_resource::<PhysicsConfig>()
