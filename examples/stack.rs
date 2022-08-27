@@ -53,8 +53,8 @@ pub enum StackMode {
 impl Default for Stack {
     fn default() -> Self {
         Self {
-            count: (5, 5, 5),
-            spacing: 1.0,
+            count: (4, 4, 4),
+            spacing: 1.1,
             time_scale: 1.0,
             mode: StackMode::Cube,
             ball_velocity: 60.0,

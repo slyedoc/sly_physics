@@ -1,7 +1,7 @@
 mod bvh;
 mod colliders;
 mod constraints;
-mod damping;
+mod drag;
 mod debug;
 mod dynamics;
 mod intersect;
@@ -42,8 +42,8 @@ pub mod prelude {
     pub use crate::{
         bvh::Ray, bvh::Tlas, colliders::*, constraints::PenetrationArena, debug::BvhCamera,
         debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState,
-        dynamics::*, types::AngularVelocity, types::CenterOfMass, types::Elasticity,
-        types::Friction, types::InertiaTensor, types::LinearVelocity, types::Mass,
+        dynamics::*, types::RBHelper, types::AngularVelocity, types::CenterOfMass, types::Elasticity,
+        types::Friction, types::InertiaTensor, types::LinearVelocity, types::Mass, types::InverseMass, types::InverseInertiaTensor,
         types::RigidBodyMode, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState,
         PhysicsSystems, RigidBodyBundle, PHYSISCS_TIMESTEP,
     };
@@ -60,7 +60,7 @@ pub struct RigidBodyBundle {
     pub friction: Friction,
     pub center_of_mass: CenterOfMass,
     pub inertia_tensor: InertiaTensor,
-    pub damping: Damping,
+    pub damping: Drag,
     pub aabb_world: AabbWorld,
     pub inverse_inertia_tensor: InverseInertiaTensor,
     // Will be added
@@ -104,7 +104,7 @@ pub enum PhysicsSystems {
     ConstraintSolve3,
     ConstraintSolve4,
     ConstraintPostSolve,
-    Damping,
+    Drag,
     Resolve,
     Camera,
     Step,
@@ -241,9 +241,9 @@ impl Plugin for PhysicsPlugin {
             PhysicsFixedUpdate,
             ConditionSet::new()
                 .run_in_state(PhysicsState::Running)
-                .label(PhysicsSystems::Damping)
+                .label(PhysicsSystems::Drag)
                 .after(PhysicsSystems::ConstraintPostSolve)
-                .with_system(damping::damping_system)
+                .with_system(drag::drag_system)
                 .into(),
         )
         .add_system_set_to_stage(
@@ -251,7 +251,7 @@ impl Plugin for PhysicsPlugin {
             ConditionSet::new()
                 .run_in_state(PhysicsState::Running)
                 .label(PhysicsSystems::Resolve)
-                .after(PhysicsSystems::Damping)
+                .after(PhysicsSystems::Drag)
                 .with_system(resolve_system)
                 .into(),
         );
@@ -282,7 +282,7 @@ fn register_inspectable_system(mut registry: ResMut<InspectableRegistry>) {
     registry.register::<InertiaTensor>();
     registry.register::<InverseInertiaTensor>();
     registry.register::<Collider>();
-    registry.register::<Damping>();
+    registry.register::<Drag>();
     registry.register::<Aabb>();
     registry.register::<AabbWorld>();
     // .register_inspectable::<Bvh>()
@@ -396,6 +396,7 @@ pub fn update_aabb(
     config: Res<PhysicsConfig>,
     collider_resources: Res<ColliderResources>,
 ) {
+
     for (trans, mut aabb_world, collider, lin_vel) in query.iter_mut() {
         //update aabbworld
         aabb_world.0 = match collider {
@@ -422,6 +423,8 @@ pub fn update_aabb(
 fn update_bvh(query: Query<(&Transform, &AabbWorld)>, mut tlas: ResMut<Tlas>) {
     tlas.update_bvh_instances(&query);
     tlas.build();
+
+
 }
 
 // TODO: We dont really want to copy the all tris twice, find better way

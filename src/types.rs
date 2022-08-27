@@ -26,8 +26,6 @@ pub struct Contact {
     pub time_of_impact: f32,
 }
 
-
-#[derive(Component, Inspectable, Debug)]
 pub struct RBHelper;
 
 impl RBHelper {
@@ -175,8 +173,9 @@ pub struct LinearVelocity(pub Vec3);
 #[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
 pub struct AngularVelocity(pub Vec3);
 
+/// assumed [0,1]
 #[derive(Component, Deref, DerefMut, Inspectable, Debug)]
-pub struct Elasticity(pub f32); // assumed [0,1]
+pub struct Elasticity(pub f32); 
 
 impl Default for Elasticity {
     fn default() -> Elasticity {
@@ -184,8 +183,9 @@ impl Default for Elasticity {
     }
 }
 
+/// assumed [0,1]
 #[derive(Component, Deref, DerefMut, Inspectable, Debug)]
-pub struct Friction(pub f32); // assumed [0,1]
+pub struct Friction(pub f32); 
 
 impl Default for Friction {
     fn default() -> Friction {
@@ -212,16 +212,14 @@ pub struct CenterOfMass(pub Vec3);
 pub struct InertiaTensor(pub Mat3);
 
 #[derive(Component, Inspectable, Debug)]
-pub struct Damping {
-    pub linear: f32,
-    pub angular: f32,
+pub struct Drag {
+    pub linear_velocity: f32,
 }
 
-impl Default for Damping {
-    fn default() -> Damping {
-        Damping {
-            linear: 0.01,
-            angular: 0.01,
+impl Default for Drag {
+    fn default() -> Drag {
+        Drag {
+            linear_velocity: 0.01,
         }
     }
 }

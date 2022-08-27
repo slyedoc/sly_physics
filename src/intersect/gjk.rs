@@ -1,6 +1,11 @@
 use bevy::prelude::*;
 
-use crate::{math::Mat4Ext, colliders::{ColliderTrait}};
+use crate::{colliders::ColliderTrait, math::Mat4Ext};
+
+// TODO: REMOVE THIS, HUGE HACK, added for bevy jam
+const GKJ_LOOP_LIMIT: u32 = 100;
+const EPA_LOOP_LIMIT: u32 = 1000;
+
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 struct Point {
@@ -30,122 +35,139 @@ impl PartialEq for Edge {
 
 impl Eq for Edge {}
 
-pub fn gjk_does_intersect<T: ColliderTrait, K: ColliderTrait>(collider_a: &T, trans_a: &Transform, collider_b: &K, trans_b: &Transform, bias: f32) -> Option<(Vec3, Vec3)> {
-    
-     const ORIGIN: Vec3 = Vec3::ZERO;
- 
-      let mut num_pts = 1;
-      let mut simplex_points =  [Point::default(); 4];
-      simplex_points[0] = support(collider_a, trans_a, collider_b, trans_b, Vec3::ONE, 0.0);
- 
-     
-      let mut closest_dist = f32::MAX;
-      let mut new_dir = -simplex_points[0].xyz;
-      loop {
-          // Get the new point to check on
-          let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, 0.0);
- 
-          // If the new point is the same as a previous point then we can't expand any further
-          if simplex_has_point(&simplex_points, &new_pt) {
-              return None;
-          }
- 
-          
-          simplex_points[num_pts] = new_pt;
-          num_pts += 1;
- 
-          // If this new point hasn't moved past the origin then the origin can not be in the set
-          // and therefore there is no collision.
-          let dotdot = new_dir.dot(new_pt.xyz - ORIGIN);
-          if dotdot < 0.0 {
-              return None;
-          }
- 
-          let mut lambdas = Vec4::ZERO;
-          if simple_signed_volumes(&simplex_points, num_pts, &mut new_dir, &mut lambdas) {
-              break;
-          }
- 
-          // Check that the new projection of the origin onto the simplex is closer than the previous
-          let dist = new_dir.length_squared();
-          if dist >= closest_dist {
-              return None;
-          }
-          closest_dist = dist;
- 
-          // Use the lambdas that support the new search direction and invalidate any points that
-          // don't support it
-         sort_valids(&mut simplex_points, &mut lambdas);
-         num_pts = num_valids(&lambdas);
-         if num_pts == 4 {
-             break;
-         }
-     }
- 
-     // Check that we have a 3-simplex (EPA expects a tetrahedron)
-     if num_pts == 1 {
-         let search_dir = -simplex_points[0].xyz;
-         let new_pt = support(collider_a, trans_a, collider_b, trans_b, search_dir, 0.0);
-         simplex_points[num_pts] = new_pt;
-         num_pts += 1;
-     }
- 
-     if num_pts == 2 {
-         let ab = simplex_points[1].xyz - simplex_points[0].xyz;
-         let u = {
-             let n = ab.normalize();
-             let v = n.any_orthonormal_vector();
-             v.cross(n)
-         };
- 
-         let new_dir = u;
-         let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, 0.0);
-         simplex_points[num_pts] = new_pt;
-         num_pts += 1;
-     }
- 
-     if num_pts == 3 {
-         let ab = simplex_points[1].xyz - simplex_points[0].xyz;
-         let ac = simplex_points[2].xyz - simplex_points[0].xyz;
-         let norm = ab.cross(ac);
- 
-         let new_dir = norm;
-         let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, 0.0);
-         simplex_points[num_pts] = new_pt;
-         num_pts += 1;
-     }
- 
-     // Expand the simplex by the bias amount
- 
-     // Get the center point of the simplex
-     let mut avg = Vec3::ZERO;
-     for simplex_point in &simplex_points {
-         avg += simplex_point.xyz;
-     }
-     avg *= 0.25;
- 
-     // Now expand the simplex by the bias amount
-     for pt in &mut simplex_points[0..num_pts] {
-         let dir = (pt.xyz - avg).normalize_or_zero();
-         pt.pt_a += dir * bias;
-         pt.pt_b -= dir * bias;
-         pt.xyz = pt.pt_a - pt.pt_b;
-     }
- 
-     // Perform EPA expansion of the simplex to find the closest face on the CSO
-     Some(epa_expand(collider_a, trans_a, collider_b, trans_b, bias, &simplex_points))
- }
- 
+pub fn gjk_does_intersect<T: ColliderTrait, K: ColliderTrait>(
+    collider_a: &T,
+    trans_a: &Transform,
+    collider_b: &K,
+    trans_b: &Transform,
+    bias: f32,
+) -> Option<(Vec3, Vec3)> {
+    const ORIGIN: Vec3 = Vec3::ZERO;
 
+    let mut num_pts = 1;
+    let mut simplex_points = [Point::default(); 4];
+    simplex_points[0] = support(collider_a, trans_a, collider_b, trans_b, Vec3::ONE, 0.0);
 
-fn epa_expand(
-    collider_a: &impl ColliderTrait,
-    trans_a: &Transform, 
-    collider_b: &impl ColliderTrait, 
-    trans_b: &Transform, 
+    let mut closest_dist = f32::MAX;
+    let mut new_dir = -simplex_points[0].xyz;
+
+    let mut gjk_tries = 0;
+
+    loop {
+        if gjk_tries >= GKJ_LOOP_LIMIT {
+            return None;
+        }
+
+        // Get the new point to check on
+        let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, 0.0);
+
+        // If the new point is the same as a previous point then we can't expand any further
+        if simplex_has_point(&simplex_points, &new_pt) {
+            return None;
+        }
+
+        simplex_points[num_pts] = new_pt;
+        num_pts += 1;
+
+        // If this new point hasn't moved past the origin then the origin can not be in the set
+        // and therefore there is no collision.
+        let dotdot = new_dir.dot(new_pt.xyz - ORIGIN);
+        if dotdot < 0.0 {
+            return None;
+        }
+
+        let mut lambdas = Vec4::ZERO;
+        if simple_signed_volumes(&simplex_points, num_pts, &mut new_dir, &mut lambdas) {
+            break;
+        }
+
+        // Check that the new projection of the origin onto the simplex is closer than the previous
+        let dist = new_dir.length_squared();
+        if dist >= closest_dist {
+            return None;
+        }
+        closest_dist = dist;
+
+        // Use the lambdas that support the new search direction and invalidate any points that
+        // don't support it
+        sort_valids(&mut simplex_points, &mut lambdas);
+        num_pts = num_valids(&lambdas);
+        if num_pts == 4 {
+            break;
+        }
+
+        gjk_tries += 1;
+    }
+
+    // Check that we have a 3-simplex (EPA expects a tetrahedron)
+    if num_pts == 1 {
+        let search_dir = -simplex_points[0].xyz;
+        let new_pt = support(collider_a, trans_a, collider_b, trans_b, search_dir, 0.0);
+        simplex_points[num_pts] = new_pt;
+        num_pts += 1;
+    }
+
+    if num_pts == 2 {
+        let ab = simplex_points[1].xyz - simplex_points[0].xyz;
+        let u = {
+            let n = ab.normalize();
+            let v = n.any_orthonormal_vector();
+            v.cross(n)
+        };
+
+        let new_dir = u;
+        let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, 0.0);
+        simplex_points[num_pts] = new_pt;
+        num_pts += 1;
+    }
+
+    if num_pts == 3 {
+        let ab = simplex_points[1].xyz - simplex_points[0].xyz;
+        let ac = simplex_points[2].xyz - simplex_points[0].xyz;
+        let norm = ab.cross(ac);
+
+        let new_dir = norm;
+        let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, 0.0);
+        simplex_points[num_pts] = new_pt;
+        num_pts += 1;
+    }
+
+    // Expand the simplex by the bias amount
+
+    // Get the center point of the simplex
+    let mut avg = Vec3::ZERO;
+    for simplex_point in &simplex_points {
+        avg += simplex_point.xyz;
+    }
+    avg *= 0.25;
+
+    // Now expand the simplex by the bias amount
+    for pt in &mut simplex_points[0..num_pts] {
+        let dir = (pt.xyz - avg).normalize_or_zero();
+        pt.pt_a += dir * bias;
+        pt.pt_b -= dir * bias;
+        pt.xyz = pt.pt_a - pt.pt_b;
+    }
+
+    // Perform EPA expansion of the simplex to find the closest face on the CSO
+    epa_expand(
+        collider_a,
+        trans_a,
+        collider_b,
+        trans_b,
+        bias,
+        &simplex_points,
+    )
+}
+
+fn epa_expand<T: ColliderTrait, K: ColliderTrait>(
+    collider_a: &T,
+    trans_a: &Transform,
+    collider_b: &K,
+    trans_b: &Transform,
     bias: f32,
     simplex_points: &[Point; 4],
-) -> (Vec3, Vec3) {
+) -> Option<(Vec3, Vec3)> {
     let mut points = Vec::new();
     let mut triangles = Vec::new();
     let mut dangling_edges = Vec::new();
@@ -175,9 +197,13 @@ fn epa_expand(
         triangles.push(tri);
     }
 
-
     // Expand the simplex to find the closest face of the CSO to the origin
+    let mut epa_tries = 0;
     loop {
+        if epa_tries >= EPA_LOOP_LIMIT {
+            return None;
+         }
+
 
         let tri = closest_triangle(&triangles, &points).unwrap();
         let normal = normal_direction(&tri, &points);
@@ -227,13 +253,14 @@ fn epa_expand(
 
             triangles.push(triangle);
         }
+        epa_tries += 1;
     }
 
     // Get the projection of the origin on the closest triangle
-    //let closest = closest_triangle(&triangles, &points);
-    // if closest.is_none() {
-    //      info!("No closest triangle found");
-    // }
+    let closest = closest_triangle(&triangles, &points);
+    if closest.is_none() {
+        info!("No closest triangle found");
+    }
     let tri = closest_triangle(&triangles, &points).unwrap();
     let pt_a = &points[tri.a as usize];
     let pt_b = &points[tri.b as usize];
@@ -264,67 +291,78 @@ fn epa_expand(
     // Return the penetration distance
     // let delta = pt_on_b - pt_on_a;
     // delta.length()
+    Some((pt_on_a, pt_on_b))
+}
+
+pub fn gjk_closest_points<T: ColliderTrait, K: ColliderTrait>(
+    collider_a: &T,
+    trans_a: &Transform,
+    collider_b: &K,
+    trans_b: &Transform,
+) -> (Vec3, Vec3) {
+    let mut closest_dist = f32::MAX;
+    const BIAS: f32 = 0.0;
+
+    let mut num_pts = 1;
+
+    let mut simplex_points = [Point::default(); 4];
+    simplex_points[0] = support(collider_a, trans_a, collider_b, trans_b, Vec3::ONE, BIAS);
+
+    let mut lambdas = Vec4::new(1.0, 0.0, 0.0, 0.0);
+    let mut new_dir = -simplex_points[0].xyz;
+    loop {
+        // get the new point to check on
+        let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, BIAS);
+
+        // if the new point is the same as the previous point then we can't expand any further
+        if simplex_has_point(&simplex_points, &new_pt) {
+            break;
+        }
+
+        // add point and get new search direction
+        simplex_points[num_pts] = new_pt;
+        num_pts += 1;
+
+        simple_signed_volumes(&simplex_points, num_pts, &mut new_dir, &mut lambdas);
+        sort_valids(&mut simplex_points, &mut lambdas);
+        num_pts = num_valids(&lambdas);
+
+        // check that the new projection of the origin onto the simplex is closer than the previous
+        let dist = new_dir.length_squared();
+        if dist >= closest_dist {
+            break;
+        }
+        closest_dist = dist;
+        if num_pts >= 4 {
+            break;
+        }
+    }
+
+    let mut pt_on_a = Vec3::ZERO;
+    let mut pt_on_b = Vec3::ZERO;
+    for (i, point) in simplex_points.iter().enumerate() {
+        pt_on_a += point.pt_a * lambdas[i];
+        pt_on_b += point.pt_b * lambdas[i];
+    }
+
     (pt_on_a, pt_on_b)
 }
 
- 
- pub fn gjk_closest_points<T: ColliderTrait, K: ColliderTrait>(collider_a: &T, trans_a: &Transform, collider_b: &K, trans_b: &Transform) -> (Vec3, Vec3) {
-     let mut closest_dist = f32::MAX;
-     const BIAS: f32 = 0.0;
- 
-     let mut num_pts = 1;
- 
-     let mut simplex_points = [Point::default(); 4];
-     simplex_points[0] = support(collider_a, trans_a, collider_b, trans_b, Vec3::ONE, BIAS);
- 
-      let mut lambdas = Vec4::new(1.0, 0.0, 0.0, 0.0);
-      let mut new_dir = -simplex_points[0].xyz;
-      loop {
-         // get the new point to check on
-         let new_pt = support(collider_a, trans_a, collider_b, trans_b,  new_dir, BIAS);
- 
-         // if the new point is the same as the previous point then we can't expand any further
-         if simplex_has_point(&simplex_points, &new_pt) {
-             break;
-         }
- 
-         // add point and get new search direction
-         simplex_points[num_pts] = new_pt;
-         num_pts += 1;
- 
-         simple_signed_volumes(&simplex_points, num_pts, &mut new_dir, &mut lambdas);
-         sort_valids(&mut simplex_points, &mut lambdas);
-         num_pts = num_valids(&lambdas);
- 
-         // check that the new projection of the origin onto the simplex is closer than the previous
-         let dist = new_dir.length_squared();
-         if dist >= closest_dist {
-             break;
-         }
-         closest_dist = dist;
-         if num_pts >= 4 {
-             break;
-         }
-     }
- 
-     let mut pt_on_a = Vec3::ZERO;
-     let mut pt_on_b = Vec3::ZERO;
-     for (i, point) in simplex_points.iter().enumerate() {
-         pt_on_a += point.pt_a * lambdas[i];
-         pt_on_b += point.pt_b * lambdas[i];
-     }
- 
-     (pt_on_a, pt_on_b)
- }
-
- fn support(collider_a: &impl ColliderTrait, trans_a: &Transform, collider_b: &impl ColliderTrait, trans_b: &Transform, dir: Vec3, bias: f32) -> Point {
+fn support<T: ColliderTrait, K: ColliderTrait>(
+    collider_a: &T,
+    trans_a: &Transform,
+    collider_b: &K,
+    trans_b: &Transform,
+    dir: Vec3,
+    bias: f32,
+) -> Point {
     let dir = dir.normalize();
 
-    // Find the point in A furthest direction    
-    let pt_a = collider_a.get_support( trans_a, dir, bias);
+    // Find the point in A furthest direction
+    let pt_a = collider_a.get_support(trans_a, dir, bias);
 
     // Find the point in B furthest direction
-    let pt_b = collider_b.get_support( trans_b, -dir, bias);
+    let pt_b = collider_b.get_support(trans_b, -dir, bias);
 
     // Return the point in the minkowski sum, furthest in the direction
     Point {
@@ -333,8 +371,6 @@ fn epa_expand(
         pt_b,
     }
 }
-
-
 
 /// Checks whether the new point already exists in the simplex
 fn simplex_has_point(simplex_points: &[Point; 4], new_pt: &Point) -> bool {
@@ -347,7 +383,6 @@ fn simplex_has_point(simplex_points: &[Point; 4], new_pt: &Point) -> bool {
     }
     false
 }
-
 
 /// Projects the origin onto the simplex to acquire the new search direction, also checks if the
 /// origin is "inside" the simplex.
@@ -392,7 +427,6 @@ fn simple_signed_volumes(
         _ => unreachable!(),
     }
 }
-
 
 fn signed_volume_1d(s1: Vec3, s2: Vec3) -> Vec2 {
     let ab = s2 - s1; // ray from a to b
@@ -605,7 +639,6 @@ fn num_valids(lambdas: &Vec4) -> usize {
     num
 }
 
-
 fn normal_direction(tri: &Tri, points: &[Point]) -> Vec3 {
     let a = points[tri.a as usize].xyz;
     let b = points[tri.b as usize].xyz;
@@ -616,7 +649,6 @@ fn normal_direction(tri: &Tri, points: &[Point]) -> Vec3 {
     let normal = ab.cross(ac);
     normal.normalize()
 }
-
 
 fn signed_distance_to_triangle(tri: &Tri, pt: Vec3, points: &[Point]) -> f32 {
     let normal = normal_direction(tri, points);
@@ -638,7 +670,6 @@ fn closest_triangle(triangles: &[Tri], points: &[Point]) -> Option<Tri> {
     }
     idx
 }
-
 
 fn triangle_has_point(w: Vec3, triangles: &[Tri], points: &[Point]) -> bool {
     const EPSILONS: f32 = 0.001 * 0.001;

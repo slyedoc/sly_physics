@@ -48,6 +48,7 @@ pub fn setup(
             mesh: box_mesh.clone(),
             material: box_mat.clone(),
             transform: Transform {
+                //translation: vec3(-8.00000667, 9.4973526, 2.5000124),
                 translation: vec3(8.00000667, 9.4973526, 2.5000124),
                 rotation: Quat::from_xyzw(-1.19166614E-7, -0.00000143082571, 0.00000248814399, 1.0),
                 ..default()
@@ -56,6 +57,7 @@ pub fn setup(
         })
         .insert_bundle(RigidBodyBundle {
             collider: box_a.clone(),
+            mass: Mass(1.0),
             ..default()
         });
 
@@ -72,6 +74,7 @@ pub fn setup(
         })
         .insert_bundle(RigidBodyBundle {
             collider: box_a,
+            mass: Mass(1.0),
             ..default()
         });
 }

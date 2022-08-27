@@ -18,6 +18,7 @@ pub fn narrow_system(
     config: Res<PhysicsConfig>,
     collider_resources: Res<ColliderResources>,
 ) {
+
     for pair in broad_contacts.iter() {
         let bodies = query.get_many_mut([pair.a, pair.b]);
         let [(mut trans_a, type_a, lin_vel_a, mut ang_vel_a, com_a, i_tensor_a), (mut trans_b, type_b, lin_vel_b, mut ang_vel_b, com_b, i_tensor_b)] =
@@ -293,6 +294,8 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
     pair: &BroadContact,
     time: f32,
 ) -> Option<Contact> {
+
+
     let mut result = None;
     let mut toi = 0.0;
     let mut num_iters = 0;

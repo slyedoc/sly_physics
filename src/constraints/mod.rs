@@ -3,7 +3,7 @@ mod constraint_constant_velocity;
 mod constraint_hinge_quat;
 mod constraint_motor;
 mod constraint_mover;
-mod constraint_orientation;
+pub mod orientation;
 pub mod penetration_manifold;
 pub mod distance;
 
@@ -19,7 +19,7 @@ use bevy::prelude::*;
 // use constraint_hinge_quat::ConstraintHingeQuatLimited;
 // use constraint_motor::ConstraintMotor;
 // use constraint_mover::ConstraintMoverSimple;
-// use constraint_orientation::ConstraintOrientation;
+pub use orientation::*;
 pub use penetration_manifold::*;
 
 
