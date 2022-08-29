@@ -27,4 +27,5 @@ I have playing with bevy for a while now and the only real option you have for p
 ## Notes
 
 Since a primary goal is preformance I am avoiding dynamic dispatching, if your new to the concept see 
-https://medium.com/digitalfrontiers/rust-dynamic-dispatching-deep-dive-236a5896e49b for a descent overview
+https://medium.com/digitalfrontiers/rust-dynamic-dispatching-deep-dive-236a5896e49b for a descent overview.
+
