@@ -25,8 +25,7 @@ pub struct ConstraintDistance {
 pub fn pre_solve(
     mut rb_query: Query<(
         &mut Transform,
-        &mut LinearVelocity,
-        &mut AngularVelocity,
+        &mut Velocity,
         &InverseMass,
         &CenterOfMass,
         &InverseInertiaTensor,
@@ -35,7 +34,7 @@ pub fn pre_solve(
     config: Res<PhysicsConfig>,
 ) {
     for mut constraint in constrain_distances.iter_mut() {
-        let [(trans_a, mut lin_vel_a, mut ang_vel_a, inv_mass_a, com_a, inv_inertia_t_a), (trans_b, mut lin_vel_b, mut ang_vel_b, inv_mass_b, com_b, inv_inertia_t_b)] =
+        let [(trans_a, mut vel_a, inv_mass_a, com_a, inv_inertia_t_a), (trans_b, mut vel_b, inv_mass_b, com_b, inv_inertia_t_b)] =
             rb_query.many_mut([constraint.body_a, constraint.body_b]);
 
         // get the world space position of the hinge from body_a's orientation
@@ -82,13 +81,12 @@ pub fn pre_solve(
         let impulses = constraint.jacobian.transpose() * constraint.cached_lambda;
         Constraint::apply_impulses(
             &trans_a,
-            &mut lin_vel_a,
-            &mut ang_vel_a,
+            &mut vel_a,
+            
             inv_mass_a,
             inv_inertia_t_a,
             &trans_b,
-            &mut lin_vel_b,
-            &mut ang_vel_b,
+            &mut vel_b,
             inv_mass_b,
             inv_inertia_t_b,
             impulses,
@@ -105,8 +103,7 @@ pub fn pre_solve(
 pub fn solve(
     mut rb_query: Query<(
         &mut Transform,
-        &mut LinearVelocity,
-        &mut AngularVelocity,
+        &mut Velocity,
         &InverseMass,
         &InverseInertiaTensor,
     )>,
@@ -115,11 +112,11 @@ pub fn solve(
     for mut constraint in constrain_distances.iter_mut() {
         let jacobian_transpose = constraint.jacobian.transpose();
 
-        let [(trans_a, mut lin_vel_a, mut ang_vel_a, inv_mass_a, inv_inertia_t_a), (trans_b, mut lin_vel_b, mut ang_vel_b, inv_mass_b, inv_inertia_t_b)] =
+        let [(trans_a, mut vel_a, inv_mass_a, inv_inertia_t_a), (trans_b, mut vel_b, inv_mass_b, inv_inertia_t_b)] =
             rb_query.many_mut([constraint.body_a, constraint.body_b]);
 
         // build the system of equations
-        let q_dt = Constraint::get_velocities(&lin_vel_a, &ang_vel_a, &lin_vel_b, &ang_vel_b);
+        let q_dt = Constraint::get_velocities(&vel_a, &vel_b);
 
         let inv_mass_matrix = Constraint::get_inverse_mass_matrix(
             &trans_a,
@@ -140,13 +137,11 @@ pub fn solve(
         let impulses = jacobian_transpose * lambda_n;
         Constraint::apply_impulses(
             &trans_a,
-            &mut lin_vel_a,
-            &mut ang_vel_a,
+            &mut vel_a,
             inv_mass_a,
             inv_inertia_t_a,
             &trans_b,
-            &mut lin_vel_b,
-            &mut ang_vel_b,
+            &mut vel_b,
             inv_mass_b,
             inv_inertia_t_b,
             impulses,

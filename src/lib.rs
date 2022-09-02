@@ -11,11 +11,11 @@ mod types;
 mod utils;
 
 use bevy::{math::vec3, prelude::*};
-use bevy_inspector_egui::{prelude::*, InspectableRegistry};
+use bevy_inspector_egui::prelude::*;
 
 use constraints::PenetrationArena;
 use iyes_loopless::prelude::*;
-use phases::{broadphase_system, narrow_system, resolve_system};
+use phases::{broad_phase, narrow_phase, resolve_phase};
 
 use bvh::*;
 use colliders::*;
@@ -42,20 +42,19 @@ pub mod prelude {
     pub use crate::{
         bvh::Ray, bvh::Tlas, colliders::*, constraints::PenetrationArena, debug::BvhCamera,
         debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState,
-        dynamics::*, types::RBHelper, types::AngularVelocity, types::CenterOfMass, types::Elasticity,
-        types::Friction, types::InertiaTensor, types::LinearVelocity, types::Mass, types::InverseMass, types::InverseInertiaTensor,
-        types::RigidBodyMode, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState,
+        dynamics::*, types::RBHelper, types::CenterOfMass, types::Elasticity,
+        types::Friction, types::InertiaTensor, types::Velocity, types::Mass, types::InverseMass, types::InverseInertiaTensor,
+        types::RigidBody, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState,
         PhysicsSystems, RigidBodyBundle, PHYSISCS_TIMESTEP,
     };
 }
 
 #[derive(Bundle, Default)]
 pub struct RigidBodyBundle {
-    pub mode: RigidBodyMode,
+    pub mode: RigidBody,
     pub collider: Collider,
     pub mass: Mass,
-    pub linear_velocity: LinearVelocity,
-    pub angular_velocity: AngularVelocity,
+    pub velocity: Velocity,
     pub elasticity: Elasticity,
     pub friction: Friction,
     pub center_of_mass: CenterOfMass,
@@ -124,12 +123,6 @@ impl Plugin for PhysicsPlugin {
             .init_resource::<ColliderResources>()
             .init_resource::<PenetrationArena>()
             .init_resource::<Tlas>()
-            .add_startup_system_set(
-                ConditionSet::new()
-                    .run_if_resource_exists::<InspectableRegistry>()
-                    .with_system(register_inspectable_system)
-                    .into(),
-            )
             .add_stage_after(
                 CoreStage::Update,
                 PhysicsFixedUpdate,
@@ -168,7 +161,7 @@ impl Plugin for PhysicsPlugin {
                     .run_in_state(PhysicsState::Running)
                     .label(PhysicsSystems::Broad)
                     .after(PhysicsSystems::UpdateBvh)
-                    .with_system(broadphase_system)
+                    .with_system(broad_phase)
                     .into(),
             )
             .add_system_set_to_stage(
@@ -177,7 +170,7 @@ impl Plugin for PhysicsPlugin {
                     .run_in_state(PhysicsState::Running)
                     .label(PhysicsSystems::Narrow)
                     .after(PhysicsSystems::Broad)
-                    .with_system(narrow_system)
+                    .with_system(narrow_phase)
                     .into(),
             )
             // Contraints
@@ -252,9 +245,32 @@ impl Plugin for PhysicsPlugin {
                 .run_in_state(PhysicsState::Running)
                 .label(PhysicsSystems::Resolve)
                 .after(PhysicsSystems::Drag)
-                .with_system(resolve_system)
+                .with_system(resolve_phase)
                 .into(),
         );
+
+        app.register_type::<Velocity>();
+        // registry.register::<RigidBodyMode>();
+        // registry.register::<LinearVelocity>();
+        // registry.register::<Static>();
+        // registry.register::<AngularVelocity>();
+        // registry.register::<Elasticity>();
+        // registry.register::<Friction>();
+        // registry.register::<Mass>();
+        // registry.register::<InverseMass>();
+        // registry.register::<CenterOfMass>();
+        // registry.register::<InertiaTensor>();
+        // registry.register::<InverseInertiaTensor>();
+        // registry.register::<Collider>();
+        // registry.register::<Drag>();
+        // registry.register::<Aabb>();
+        // registry.register::<AabbWorld>();
+        // // .register_inspectable::<Bvh>()
+        // // .register_inspectable::<debug::BvhCamera>()
+        // // .register_inspectable::<Tlas>()
+        // // .register_inspectable::<TlasNode>()
+        // //.register_inspectable::<Tri>()
+        // registry.register::<Aabb>();
 
         #[cfg(feature = "step")]
         app.add_system_set_to_stage(
@@ -269,29 +285,6 @@ impl Plugin for PhysicsPlugin {
     }
 }
 
-fn register_inspectable_system(mut registry: ResMut<InspectableRegistry>) {
-    registry.register::<RigidBodyMode>();
-    registry.register::<LinearVelocity>();
-    registry.register::<Static>();
-    registry.register::<AngularVelocity>();
-    registry.register::<Elasticity>();
-    registry.register::<Friction>();
-    registry.register::<Mass>();
-    registry.register::<InverseMass>();
-    registry.register::<CenterOfMass>();
-    registry.register::<InertiaTensor>();
-    registry.register::<InverseInertiaTensor>();
-    registry.register::<Collider>();
-    registry.register::<Drag>();
-    registry.register::<Aabb>();
-    registry.register::<AabbWorld>();
-    // .register_inspectable::<Bvh>()
-    // .register_inspectable::<debug::BvhCamera>()
-    // .register_inspectable::<Tlas>()
-    // .register_inspectable::<TlasNode>()
-    //.register_inspectable::<Tri>()
-    registry.register::<Aabb>();
-}
 
 // Note: Assuming meshes are loaded
 #[allow(clippy::type_complexity)]
@@ -301,7 +294,7 @@ pub fn spawn(
         (
             Entity,
             &Collider,
-            &RigidBodyMode,
+            &RigidBody,
             &mut Mass,
             &mut CenterOfMass,
             &mut InertiaTensor,
@@ -324,7 +317,7 @@ pub fn spawn(
     {
         // Setup RigidBody components
         let is_static = match rb_mode {
-            RigidBodyMode::Static => {
+            RigidBody::Static => {
                 commands.entity(e).insert(Static);
                 true
             }
@@ -392,7 +385,7 @@ fn stop_step(mut commands: Commands) {
 }
 
 pub fn update_aabb(
-    mut query: Query<(&Transform, &mut AabbWorld, &Collider, &LinearVelocity)>,
+    mut query: Query<(&Transform, &mut AabbWorld, &Collider, &Velocity)>,
     config: Res<PhysicsConfig>,
     collider_resources: Res<ColliderResources>,
 ) {

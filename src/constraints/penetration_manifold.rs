@@ -193,8 +193,7 @@ impl ConstraintPenetration {
 pub fn pre_solve(
     mut rb_query: Query<(
         &mut Transform,
-        &mut LinearVelocity,
-        &mut AngularVelocity,
+        &mut Velocity,        
         &InverseMass,
         &Friction,
         &CenterOfMass,
@@ -205,7 +204,7 @@ pub fn pre_solve(
 ) {
     for (pair, manifold) in &mut manifold_arena.manifolds {
         if let Ok(
-            [(trans_a, mut lin_vel_a, mut ang_vel_a, inv_mass_a, frict_a, com_a, inv_inert_t_a), (trans_b, mut lin_vel_b, mut ang_vel_b, inv_mass_b, frict_b, com_b, inv_inert_t_b)],
+            [(trans_a, mut vel_a, inv_mass_a, frict_a, com_a, inv_inert_t_a), (trans_b, mut vel_b, inv_mass_b, frict_b, com_b, inv_inert_t_b)],
         ) = rb_query.get_many_mut([pair.a, pair.b])
         {
             for constraint in manifold.constraints.iter_mut() {
@@ -317,13 +316,11 @@ pub fn pre_solve(
                 let impulses = constraint.jacobian.transpose() * constraint.cached_lambda;
                 Constraint::apply_impulses(
                     &trans_a,
-                    &mut lin_vel_a,
-                    &mut ang_vel_a,
+                    &mut vel_a,
                     inv_mass_a,
                     inv_inert_t_a,
                     &trans_b,
-                    &mut lin_vel_b,
-                    &mut ang_vel_b,
+                    &mut vel_b,
                     inv_mass_b,
                     inv_inert_t_b,
                     impulses,
@@ -349,8 +346,7 @@ pub fn solve(
     mut manifold_arena: ResMut<PenetrationArena>,
     mut rb_query: Query<(
         &mut Transform,
-        &mut LinearVelocity,
-        &mut AngularVelocity,
+        &mut Velocity,        
         &InverseMass,
         &InverseInertiaTensor,
     )>,
@@ -358,15 +354,13 @@ pub fn solve(
     for (pair, manifold) in &mut manifold_arena.manifolds {
         let [(
             trans_a,
-            mut lin_vel_a,
-            mut ang_vel_a,
+            mut vel_a,
             inv_mass_a,
            
             inv_inertia_tensor_a,
         ), (
             trans_b,
-            mut lin_vel_b,
-            mut ang_vel_b,
+            mut vel_b,
             inv_mass_b,
             inv_inertia_tensor_b,
         )] = rb_query.many_mut([pair.a, pair.b]);
@@ -375,7 +369,7 @@ pub fn solve(
             let jacobian_transpose = constraint.jacobian.transpose();
 
             // build the system of equations
-            let q_dt = Constraint::get_velocities(&lin_vel_a, &ang_vel_a, &lin_vel_b, &ang_vel_b);
+            let q_dt = Constraint::get_velocities(&vel_a, &vel_b);
             let inv_mass_matrix = Constraint::get_inverse_mass_matrix(
                 &trans_a,
                 inv_mass_a,
@@ -428,13 +422,11 @@ pub fn solve(
             let impulses = jacobian_transpose * lambda_n;
             Constraint::apply_impulses(
                 &trans_a,
-                &mut lin_vel_a,
-                &mut ang_vel_a,
+                &mut vel_a,
                 inv_mass_a,
                 inv_inertia_tensor_a,
                 &trans_b,
-                &mut lin_vel_b,
-                &mut ang_vel_b,
+                &mut vel_b,
                 inv_mass_b,
                 inv_inertia_tensor_b,
                 impulses,

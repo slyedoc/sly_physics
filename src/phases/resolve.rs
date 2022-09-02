@@ -3,12 +3,11 @@ use bevy::prelude::*;
 use crate::*;
 
 #[allow(clippy::type_complexity)]
-pub fn resolve_system(
+pub fn resolve_phase(
     mut contacts_events: EventReader<Contact>,
     mut query: Query<(
         &mut Transform,
-        &mut LinearVelocity,
-        &mut AngularVelocity,
+        &mut Velocity,
         &InverseMass,
         &Elasticity,
         &Friction,
@@ -45,8 +44,7 @@ pub fn resolve_system(
 fn step_rigibbodies(
     query: &mut Query<(
         &mut Transform,
-        &mut LinearVelocity,
-        &mut AngularVelocity,
+        &mut Velocity,
         &InverseMass,
         &Elasticity,
         &Friction,
@@ -58,8 +56,7 @@ fn step_rigibbodies(
 ) {
     for (
         mut transform,
-        linear_vel,
-        mut ang_vel,
+        mut vel,
         _inv_mass,
         _elas,
         _friction,
@@ -70,8 +67,7 @@ fn step_rigibbodies(
     {
         RBHelper::update(
             &mut transform,
-            &mut ang_vel,
-            &linear_vel,
+            &mut vel,
             com,
             inertia_tensor,
             time,
@@ -83,8 +79,7 @@ fn step_rigibbodies(
 fn resolve_contact(
     query: &mut Query<(
         &mut Transform,
-        &mut LinearVelocity,
-        &mut AngularVelocity,
+        &mut Velocity,
         &InverseMass,
         &Elasticity,
         &Friction,
@@ -96,8 +91,7 @@ fn resolve_contact(
 ) {
     let [(
         mut trans_a,
-        mut linear_vel_a,
-        mut ang_vel_a,
+        mut vel_a,
         inv_mass_a,
         elas_a,
         friction_a,
@@ -106,8 +100,7 @@ fn resolve_contact(
         inv_inertia_a,
     ), (
         mut trans_b,
-        mut linear_vel_b,
-        mut ang_vel_b,
+        mut vel_b,
         inv_mass_b,
         elas_b,
         friction_b,
@@ -136,18 +129,17 @@ fn resolve_contact(
     let angular_factor = (angular_j_a + angular_j_b).dot(contact.normal);
 
     // Get the world space velocity of the motion and rotation
-    let vel_a = linear_vel_a.0 + ang_vel_a.0.cross(ra);
-    let vel_b = linear_vel_b.0 + ang_vel_b.0.cross(rb);
+    let world_vel_a = vel_a.linear + vel_a.angular.cross(ra);
+    let world_vel_b = vel_b.linear + vel_b.angular.cross(rb);
 
     // Calculate the collion impulse
-    let vab = vel_a - vel_b;
+    let vab = world_vel_a - world_vel_b;
     let impluse_j =
         -(1.0 + elasticity) * vab.dot(contact.normal) / (total_inv_mass + angular_factor);
     let impluse_vec_j = contact.normal * impluse_j;
     RBHelper::apply_impulse(
         &trans_a,
-        &mut linear_vel_a,
-        &mut ang_vel_a,
+        &mut vel_a,
         inv_mass_a,
         com_a,
         inv_inertia_a,
@@ -156,8 +148,7 @@ fn resolve_contact(
     );
     RBHelper::apply_impulse(
         &trans_b,
-        &mut linear_vel_b,
-        &mut ang_vel_b,
+        &mut vel_b,
         inv_mass_b,
         com_a,
         inv_inertia_b,
@@ -191,8 +182,7 @@ fn resolve_contact(
         // apply kinetic friction
         RBHelper::apply_impulse(
             &trans_a,
-            &mut linear_vel_a,
-            &mut ang_vel_a,
+            &mut vel_a,
             inv_mass_a,
             com_a,
             inv_inertia_a,
@@ -201,8 +191,7 @@ fn resolve_contact(
         );
         RBHelper::apply_impulse(
             &trans_b,
-            &mut linear_vel_b,
-            &mut ang_vel_b,
+            &mut vel_b,
             inv_mass_b,
             com_b,
             inv_inertia_b,

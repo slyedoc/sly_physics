@@ -1,4 +1,4 @@
-use crate::{prelude::LinearVelocity, types::Aabb, BOUNDS_EPS};
+use crate::{types::{Aabb, Velocity}, BOUNDS_EPS};
 use bevy::{math::vec3, prelude::*};
 
 use super::ColliderTrait;
@@ -45,7 +45,7 @@ impl ColliderTrait for SphereCollider {
     fn get_world_aabb(
         &self,
         trans: &Transform,
-        linear_velocity: &LinearVelocity,
+        velocity: &Velocity,
         time: f32,
     ) -> Aabb {
         let mut aabb = Aabb {
@@ -54,9 +54,9 @@ impl ColliderTrait for SphereCollider {
         };
 
         // expand by the linear velocity
-        let p1 = aabb.mins + linear_velocity.0 * time;
+        let p1 = aabb.mins + velocity.linear * time;
         aabb.expand_by_point(p1);
-        let p2 = aabb.maxs + linear_velocity.0 * time;
+        let p2 = aabb.maxs + velocity.linear * time;
         aabb.expand_by_point(p2);
 
         // ex

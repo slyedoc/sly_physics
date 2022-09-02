@@ -2,15 +2,14 @@
 mod constraint_constant_velocity;
 mod constraint_hinge_quat;
 mod constraint_motor;
-mod constraint_mover;
 pub mod orientation;
 pub mod penetration_manifold;
 pub mod distance;
 
 use crate::{
     math::{MatMN, VecN},
-    AngularVelocity, InverseInertiaTensor,
-    InverseMass, LinearVelocity, RBHelper
+    InverseInertiaTensor,
+    InverseMass, RBHelper, prelude::Velocity
 };
 use bevy::prelude::*;
 
@@ -70,28 +69,27 @@ impl Constraint {
     }
 
     pub fn get_velocities(
-        lin_vel_a: &LinearVelocity,
-        ang_vel_a: &AngularVelocity,
-        lin_vel_b: &LinearVelocity,
-        ang_vel_b: &AngularVelocity,
+        vel_a: &Velocity,
+        
+        vel_b: &Velocity,
     ) -> VecN<12> {
         let mut q_dt = VecN::zero();
 
-        q_dt[0] = lin_vel_a.x;
-        q_dt[1] = lin_vel_a.y;
-        q_dt[2] = lin_vel_a.z;
+        q_dt[0] = vel_a.linear.x;
+        q_dt[1] = vel_a.linear.y;
+        q_dt[2] = vel_a.linear.z;
 
-        q_dt[3] = ang_vel_a.x;
-        q_dt[4] = ang_vel_a.y;
-        q_dt[5] = ang_vel_a.z;
+        q_dt[3] = vel_a.angular.x;
+        q_dt[4] = vel_a.angular.y;
+        q_dt[5] = vel_a.angular.z;
 
-        q_dt[6] = lin_vel_b.x;
-        q_dt[7] = lin_vel_b.y;
-        q_dt[8] = lin_vel_b.z;
+        q_dt[6] = vel_b.linear.x;
+        q_dt[7] = vel_b.linear.y;
+        q_dt[8] = vel_b.linear.z;
 
-        q_dt[9] = ang_vel_b.x;
-        q_dt[10] = ang_vel_b.y;
-        q_dt[11] = ang_vel_b.z;
+        q_dt[9] =  vel_b.angular.x;
+        q_dt[10] = vel_b.angular.y;
+        q_dt[11] = vel_b.angular.z;
 
         q_dt
     }
@@ -100,14 +98,12 @@ impl Constraint {
     pub fn apply_impulses(
         // A
         trans_a: &Transform,
-        lin_vel_a: &mut LinearVelocity,
-        ang_vel_a: &mut AngularVelocity,
+        vel_a: &mut Velocity,        
         inv_mass_a: &InverseMass,
         inv_inertia_tensor_a: &InverseInertiaTensor,
         // B
         trans_b: &Transform,
-        lin_vel_b: &mut LinearVelocity,
-        ang_vel_b: &mut AngularVelocity,
+        vel_b: &mut Velocity,
         inv_mass_b: &InverseMass,
         inv_inertia_tensor_b: &InverseInertiaTensor,
         impulses: VecN<12>,
@@ -116,10 +112,10 @@ impl Constraint {
             let force_internal_a = Vec3::from_slice(&impulses[0..]);
             let torque_internal_a = Vec3::from_slice(&impulses[3..]);
 
-            RBHelper::apply_impulse_linear(lin_vel_a, inv_mass_a, force_internal_a);
+            RBHelper::apply_impulse_linear(vel_a, inv_mass_a, force_internal_a);
             RBHelper::apply_impulse_angular(
                 trans_a,
-                ang_vel_a,
+                vel_a,
                 inv_mass_a,
                 inv_inertia_tensor_a,
                 torque_internal_a,
@@ -129,10 +125,10 @@ impl Constraint {
         {
             let force_internal_b = Vec3::from_slice(&impulses[6..]);
             let torque_internal_b = Vec3::from_slice(&impulses[9..]);
-            RBHelper::apply_impulse_linear(lin_vel_b, inv_mass_b, force_internal_b);
+            RBHelper::apply_impulse_linear(vel_b, inv_mass_b, force_internal_b);
             RBHelper::apply_impulse_angular(
                 trans_b,
-                ang_vel_b,
+                vel_b,
                 inv_mass_b,
                 inv_inertia_tensor_b,
                 torque_internal_b,

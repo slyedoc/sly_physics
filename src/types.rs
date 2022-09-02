@@ -55,8 +55,7 @@ impl RBHelper {
     #[allow(clippy::too_many_arguments)]
     pub fn apply_impulse(
         trans: &Transform,
-        linear_velocity: &mut LinearVelocity,
-        angular_velocity: &mut AngularVelocity,
+        velocity: &mut Velocity,        
         inv_mass: &InverseMass,
         com: &CenterOfMass,
         inv_inertia_tensor: &InverseInertiaTensor,
@@ -68,15 +67,15 @@ impl RBHelper {
         }
         // impulse_point is in world space location of the applied impulse
         // impulse is in world space direction and magnitude of the impulse
-        RBHelper::apply_impulse_linear(linear_velocity, inv_mass, impulse);
+        RBHelper::apply_impulse_linear(velocity, inv_mass, impulse);
 
         let r = impulse_point - RBHelper::centre_of_mass_world(trans, com);
         let dl = r.cross(impulse); // this is in world space
-        RBHelper::apply_impulse_angular(trans, angular_velocity, inv_mass, inv_inertia_tensor, dl);
+        RBHelper::apply_impulse_angular(trans, velocity, inv_mass, inv_inertia_tensor, dl);
     }
 
     pub fn apply_impulse_linear(
-        linear_velocity: &mut LinearVelocity,
+        velocity: &mut Velocity,
         inv_mass: &InverseMass,
         impulse: Vec3,
     ) {
@@ -86,11 +85,11 @@ impl RBHelper {
         // p = mv
         // dp = m dv = J
         // => dv = J / m
-        linear_velocity.0 += impulse * inv_mass.0;
+        velocity.linear += impulse * inv_mass.0;
     }
     pub fn apply_impulse_angular(
         trans: &Transform,
-        angular_velocity: &mut AngularVelocity,
+        velocity: &mut Velocity,
         inv_mass: &InverseMass,
         inv_inertia_tensor: &InverseInertiaTensor,
         impulse: Vec3,
@@ -102,24 +101,22 @@ impl RBHelper {
         // L = I w = r x p
         // dL = I dw = r x J
         // => dw = I^-1 * (r x J)
-        angular_velocity.0 +=
-            RBHelper::inv_intertia_tensor_world(trans, inv_inertia_tensor) * impulse;
+        velocity.angular += RBHelper::inv_intertia_tensor_world(trans, inv_inertia_tensor) * impulse;
 
         // clamp angular_velocity
-        if angular_velocity.0.length_squared() > MAX_ANGULAR_SPEED_SQ {
-            angular_velocity.0 = angular_velocity.0.normalize() * MAX_ANGULAR_SPEED;
+        if velocity.angular.length_squared() > MAX_ANGULAR_SPEED_SQ {
+            velocity.angular = velocity.angular.normalize() * MAX_ANGULAR_SPEED;
         }
     }
 
     pub fn update(
         transform: &mut Transform,
-        angular_velocity: &mut AngularVelocity,
-        linear_velocity: &LinearVelocity,
+        velocity: &mut Velocity,        
         com: &CenterOfMass,
         inertia_tensor: &InertiaTensor,
         dt: f32,
     ) {
-        transform.translation += linear_velocity.0 * dt;
+        transform.translation += velocity.linear * dt;
         // we have an angular velocity around the centre of mass, this needs to be converted to
         // relative body translation. This way we can properly update the rotation of the model
         let com_world = transform.translation + transform.rotation * com.0;
@@ -132,13 +129,11 @@ impl RBHelper {
         let orientation = Mat3::from_quat(transform.rotation);
         let inertia_tensor = orientation * inertia_tensor.0 * orientation.transpose();
         let alpha = inertia_tensor.inverse()
-            * (angular_velocity
-                .0
-                .cross(inertia_tensor * angular_velocity.0));
-        angular_velocity.0 += alpha * dt;
+            * (velocity.angular.cross(inertia_tensor * velocity.angular));
+        velocity.angular += alpha * dt;
 
         // update orientation
-        let d_angle = angular_velocity.0 * dt;
+        let d_angle = velocity.angular * dt;
         let angle = d_angle.length();
         let rcp_angle = angle.recip();
         let dq = if rcp_angle.is_finite() {
@@ -153,25 +148,26 @@ impl RBHelper {
 }
 
 #[derive(Component, Inspectable, Debug, PartialEq, Eq)]
-pub enum RigidBodyMode {
+pub enum RigidBody {
     Static,
     Dynamic,
 }
 
-impl Default for RigidBodyMode {
+impl Default for RigidBody {
     fn default() -> Self {
-        RigidBodyMode::Dynamic
+        RigidBody::Dynamic
     }
 }
 
 #[derive(Component, Inspectable, Debug)]
 pub struct Static;
 
-#[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
-pub struct LinearVelocity(pub Vec3);
-
-#[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
-pub struct AngularVelocity(pub Vec3);
+#[derive(Component, Reflect, Debug, Default)]
+#[reflect(Component)]
+pub struct Velocity {
+    pub linear: Vec3,
+    pub angular: Vec3,
+}
 
 /// assumed [0,1]
 #[derive(Component, Deref, DerefMut, Inspectable, Debug)]

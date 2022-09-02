@@ -81,7 +81,7 @@ pub fn setup_room(
         })
         .insert_bundle(RigidBodyBundle {
             collider: collider_resources.add_box(vec3(floor_size, 1.0, floor_size)),
-            mode: RigidBodyMode::Static,
+            mode: RigidBody::Static,
             ..default()
         })
         .insert(Name::new("Floor"));
@@ -106,7 +106,7 @@ pub fn setup_room(
             })
             .insert_bundle(RigidBodyBundle {
                 collider: collider_resources.add_box(vec3(floor_size, wall_height, 1.0)),
-                mode: RigidBodyMode::Static,
+                mode: RigidBody::Static,
                 ..default()
             })
             .insert(Name::new("Wall"));

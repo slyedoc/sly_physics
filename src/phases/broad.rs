@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     bvh::Tlas,
-    types::{AabbWorld, BroadContact, RigidBodyMode, Static},
+    types::{AabbWorld, BroadContact, RigidBody, Static},
 };
 
 // Sweep and Prune
@@ -10,9 +10,9 @@ use crate::{
 // I have tried different approaches, and I am sure I will try a few more
 // So far this simple approach has been the faster
 #[allow(dead_code)]
-pub fn broadphase_system(
+pub fn broad_phase(
     mut broad_contacts: EventWriter<BroadContact>,
-    query: Query<(Entity, &AabbWorld, Option<&Static>), With<RigidBodyMode>>,
+    query: Query<(Entity, &AabbWorld, Option<&Static>), With<RigidBody>>,
 ) {
     // TODO: Yes, we are copying the array out here, only way to sort it
     // Ideally we would keep the array around, it should already near sorted

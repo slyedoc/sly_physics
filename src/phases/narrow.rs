@@ -3,12 +3,11 @@ use bevy::prelude::*;
 use crate::{colliders::*, constraints::PenetrationArena, intersect::*, types::*, PhysicsConfig};
 
 #[cfg(feature = "continuous")]
-pub fn narrow_system(
+pub fn narrow_phase(
     mut query: Query<(
         &mut Transform,
-        &Collider,
-        &LinearVelocity,
-        &mut AngularVelocity,
+        &Collider,        
+        &mut Velocity,
         &CenterOfMass,
         &InertiaTensor,
     )>,
@@ -21,7 +20,7 @@ pub fn narrow_system(
 
     for pair in broad_contacts.iter() {
         let bodies = query.get_many_mut([pair.a, pair.b]);
-        let [(mut trans_a, type_a, lin_vel_a, mut ang_vel_a, com_a, i_tensor_a), (mut trans_b, type_b, lin_vel_b, mut ang_vel_b, com_b, i_tensor_b)] =
+        let [(mut trans_a, type_a, mut vel_a, com_a, i_tensor_a), (mut trans_b, type_b, mut vel_b, com_b, i_tensor_b)] =
             bodies.unwrap();
 
         // TODO: ideally we can use different collision test between different shapes, for now really only sphere sphere has its own
@@ -38,15 +37,14 @@ pub fn narrow_system(
                     sphere_b.radius,
                     trans_a.translation,
                     trans_b.translation,
-                    lin_vel_a.0,
-                    lin_vel_b.0,
+                    vel_a.linear,
+                    vel_b.linear,
                     config.time,
                 ) {
                     // step bodies forward to get local space collision points
                     RBHelper::update(
                         &mut trans_a,
-                        &mut ang_vel_a,
-                        lin_vel_a,
+                        &mut vel_a,                        
                         com_a,
                         i_tensor_a,
                         time_of_impact,
@@ -54,8 +52,7 @@ pub fn narrow_system(
 
                     RBHelper::update(
                         &mut trans_b,
-                        &mut ang_vel_b,
-                        lin_vel_b,
+                        &mut vel_b,                        
                         com_b,
                         i_tensor_b,
                         time_of_impact,
@@ -70,16 +67,14 @@ pub fn narrow_system(
                     // unwind time step
                     RBHelper::update(
                         &mut trans_a,
-                        &mut ang_vel_a,
-                        lin_vel_a,
+                        &mut vel_a,
                         com_a,
                         i_tensor_a,
                         -time_of_impact,
                     );
                     RBHelper::update(
                         &mut trans_b,
-                        &mut ang_vel_b,
-                        lin_vel_b,
+                        &mut vel_b,
                         com_b,
                         i_tensor_b,
                         -time_of_impact,
@@ -110,14 +105,12 @@ pub fn narrow_system(
                 conservative_advancement::<BoxCollider, BoxCollider>(
                     cube_a,
                     &mut trans_a,
-                    &mut ang_vel_a,
-                    lin_vel_a,
+                    &mut vel_a,
                     com_a,
                     i_tensor_a,
                     cube_b,
                     &mut trans_b,
-                    &mut ang_vel_b,
-                    lin_vel_b,
+                    &mut vel_b,
                     com_b,
                     i_tensor_b,
                     pair,
@@ -130,14 +123,12 @@ pub fn narrow_system(
                 conservative_advancement::<SphereCollider, BoxCollider>(
                     sphere_a,
                     &mut trans_a,
-                    &mut ang_vel_a,
-                    lin_vel_a,
+                    &mut vel_a,
                     com_a,
                     i_tensor_a,
                     cube,
                     &mut trans_b,
-                    &mut ang_vel_b,
-                    lin_vel_b,
+                    &mut vel_b,
                     com_b,
                     i_tensor_b,
                     pair,
@@ -150,14 +141,12 @@ pub fn narrow_system(
                 conservative_advancement::<BoxCollider, SphereCollider>(
                     cube,
                     &mut trans_a,
-                    &mut ang_vel_a,
-                    lin_vel_a,
+                    &mut vel_a,
                     com_a,
                     i_tensor_a,
                     sphere,
                     &mut trans_b,
-                    &mut ang_vel_b,
-                    lin_vel_b,
+                    &mut vel_b,
                     com_b,
                     i_tensor_b,
                     pair,
@@ -170,14 +159,12 @@ pub fn narrow_system(
                 conservative_advancement::<SphereCollider, ConvexCollider>(
                     sphere,
                     &mut trans_a,
-                    &mut ang_vel_a,
-                    lin_vel_a,
+                    &mut vel_a,
                     com_a,
                     i_tensor_a,
                     convex,
                     &mut trans_b,
-                    &mut ang_vel_b,
-                    lin_vel_b,
+                    &mut vel_b,
                     com_b,
                     i_tensor_b,
                     pair,
@@ -190,14 +177,12 @@ pub fn narrow_system(
                 conservative_advancement::<BoxCollider, ConvexCollider>(
                     cube,
                     &mut trans_a,
-                    &mut ang_vel_a,
-                    lin_vel_a,
+                    &mut vel_a,
                     com_a,
                     i_tensor_a,
                     convex,
                     &mut trans_b,
-                    &mut ang_vel_b,
-                    lin_vel_b,
+                    &mut vel_b,
                     com_b,
                     i_tensor_b,
                     pair,
@@ -210,14 +195,12 @@ pub fn narrow_system(
                 conservative_advancement::<ConvexCollider, SphereCollider>(
                     convex,
                     &mut trans_a,
-                    &mut ang_vel_a,
-                    lin_vel_a,
+                    &mut vel_a,
                     com_a,
                     i_tensor_a,
                     sphere,
                     &mut trans_b,
-                    &mut ang_vel_b,
-                    lin_vel_b,
+                    &mut vel_b,
                     com_b,
                     i_tensor_b,
                     pair,
@@ -230,14 +213,12 @@ pub fn narrow_system(
                 conservative_advancement::<ConvexCollider, BoxCollider>(
                     convex,
                     &mut trans_a,
-                    &mut ang_vel_a,
-                    lin_vel_a,
+                    &mut vel_a,
                     com_a,
                     i_tensor_a,
                     cube,
                     &mut trans_b,
-                    &mut ang_vel_b,
-                    lin_vel_b,
+                    &mut vel_b,
                     com_b,
                     i_tensor_b,
                     pair,
@@ -250,14 +231,12 @@ pub fn narrow_system(
                 conservative_advancement::<ConvexCollider, ConvexCollider>(
                     convex_a,
                     &mut trans_a,
-                    &mut ang_vel_a,
-                    lin_vel_a,
+                    &mut vel_a,
                     com_a,
                     i_tensor_a,
                     convex_b,
                     &mut trans_b,
-                    &mut ang_vel_b,
-                    lin_vel_b,
+                    &mut vel_b,
                     com_b,
                     i_tensor_b,
                     pair,
@@ -280,15 +259,13 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
     // Shape A
     shape_a: &T,
     trans_a: &mut Transform,
-    ang_vel_a: &mut AngularVelocity,
-    lin_vel_a: &LinearVelocity,
+    vel_a: &mut Velocity,
     com_a: &CenterOfMass,
     i_tensor_a: &InertiaTensor,
     // Shape B
     shape_b: &K,
     trans_b: &mut Transform,
-    ang_vel_b: &mut AngularVelocity,
-    lin_vel_b: &LinearVelocity,
+    vel_b: &mut Velocity,    
     com_b: &CenterOfMass,
     i_tensor_b: &InertiaTensor,
     pair: &BroadContact,
@@ -340,12 +317,12 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
         let ab = (world_point_b - world_point_a).normalize_or_zero();
 
         // project the relative velocity onto the ray of shortest distance
-        let relative_velocity = lin_vel_a.0 - lin_vel_b.0;
+        let relative_velocity = vel_a.linear - vel_b.linear;
         let mut ortho_speed = relative_velocity.dot(ab);
 
         // add to the ortho_speed the maximum angular speeds of the relative shapes
-        let angular_speed_a = shape_a.fastest_linear_speed(ang_vel_a.0, ab);
-        let angular_speed_b = shape_b.fastest_linear_speed(ang_vel_b.0, -ab);
+        let angular_speed_a = shape_a.fastest_linear_speed(vel_a.angular, ab);
+        let angular_speed_b = shape_b.fastest_linear_speed(vel_b.angular, -ab);
 
         ortho_speed += angular_speed_a + angular_speed_b;
 
@@ -362,12 +339,12 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
         toi += time_to_go;
 
         // advanceme
-        RBHelper::update(trans_a, ang_vel_a, lin_vel_a, com_a, i_tensor_a, time_to_go);
-        RBHelper::update(trans_b, ang_vel_b, lin_vel_b, com_b, i_tensor_b, time_to_go);
+        RBHelper::update(trans_a, vel_a, com_a, i_tensor_a, time_to_go);
+        RBHelper::update(trans_b, vel_b, com_b, i_tensor_b, time_to_go);
     }
     // unwind the clock
-    RBHelper::update(trans_a, ang_vel_a, lin_vel_a, com_a, i_tensor_a, -toi);
-    RBHelper::update(trans_b, ang_vel_b, lin_vel_b, com_b, i_tensor_b, -toi);
+    RBHelper::update(trans_a, vel_a, com_a, i_tensor_a, -toi);
+    RBHelper::update(trans_b, vel_b, com_b, i_tensor_b, -toi);
     result
 }
 

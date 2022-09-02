@@ -3,8 +3,8 @@ use bevy_inspector_egui::Inspectable;
 use iyes_loopless::prelude::*;
 
 use crate::{
-    InverseMass, LinearVelocity, Mass, PhysicsConfig, PhysicsFixedUpdate, PhysicsState,
-    PhysicsSystems, Static,
+    InverseMass, Mass, PhysicsConfig, PhysicsFixedUpdate, PhysicsState,
+    PhysicsSystems, Static, types::Velocity,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
@@ -40,16 +40,16 @@ impl Default for Gravity {
 }
 
 pub fn gravity_system(
-    mut query: Query<(&mut LinearVelocity, &Mass, &InverseMass), Without<Static>>,
+    mut query: Query<(&mut Velocity, &Mass, &InverseMass), Without<Static>>,
     gravity: Res<Gravity>,
     config: Res<PhysicsConfig>,
 ) {
-    for (mut linear_velocity, mass, inv_mass) in query.iter_mut() {
+    for (mut velocity, mass, inv_mass) in query.iter_mut() {
         // since rb is not static, inv mass should be greater than 0
         debug_assert!(inv_mass.0 > 0.0);
 
         // Apply Gravity, it needs to be an impluse
         let gravey_impluse = gravity.0 * mass.0 * config.time;
-        linear_velocity.0 += gravey_impluse * inv_mass.0;
+        velocity.linear += gravey_impluse * inv_mass.0;
     }
 }

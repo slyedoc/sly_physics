@@ -23,7 +23,7 @@ fn did_sphere_fall() {
         })
         .insert_bundle(RigidBodyBundle {
             collider: sphere_collider,
-            mode: RigidBodyMode::Dynamic,
+            mode: RigidBody::Dynamic,
             elasticity: Elasticity(1.0),
             ..default()
         })
@@ -51,7 +51,7 @@ fn spawn_ground(
         })
         .insert_bundle(RigidBodyBundle {
             collider: collider_resources.add_box(vec3(10.0, 1.0, 10.0)),
-            mode: RigidBodyMode::Static,
+            mode: RigidBody::Static,
             elasticity: Elasticity(1.0),
             ..default()
         });

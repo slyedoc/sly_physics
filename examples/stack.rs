@@ -133,7 +133,10 @@ pub fn setup(
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
-            linear_velocity: LinearVelocity(vec3(-stack.ball_velocity, 0.0, 0.0)),
+            velocity: Velocity {
+                linear: vec3(-stack.ball_velocity, 0.0, 0.0),
+                ..default()
+            },
             collider: collider_resources.add_sphere(wreak_ball_radius),
             mass: Mass(20.0),
             ..default()
