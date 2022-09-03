@@ -19,6 +19,8 @@ fn main() {
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
         .add_plugin(PhysicsBvhCameraPlugin)
+        // testing aabb debug plugin
+        .add_plugin(DebugAabbPlugin)
         // local setup stuff
         .add_plugin(HelperPlugin)
         .add_plugin(CameraControllerPlugin)

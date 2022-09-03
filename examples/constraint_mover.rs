@@ -1,9 +1,11 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::PresentMode};
+use bevy_inspector_egui::WorldInspectorPlugin;
+use helper::{HelperPlugin, AppState};
+use iyes_loopless::prelude::*;
+use sly_camera_controller::CameraControllerPlugin;
+use sly_physics::prelude::*;
 
-use crate::{types::{
-    Velocity,
-}, PhysicsConfig};
-
+// TODO: make this work
 
 #[derive(Component)]
 pub struct ConstraintMoverSimple {
@@ -26,3 +28,27 @@ fn pre_solve(
     }
 }
 
+mod helper;
+
+fn main() {
+    App::new()
+        .insert_resource(WindowDescriptor {
+            present_mode: PresentMode::Fifo,
+            ..default()
+        })
+        .add_plugins(DefaultPlugins)
+
+        .add_plugin(WorldInspectorPlugin::default())
+        // our phsycis plugin
+        .add_plugin(PhysicsPlugin)
+        .add_plugin(GravityPlugin)
+        .add_plugin(PhysicsDebugPlugin)
+        .add_plugin(PhysicsBvhCameraPlugin)
+        
+        .add_plugin(HelperPlugin)
+        .add_plugin(CameraControllerPlugin)
+        .add_startup_system(helper::setup_camera)
+        .add_enter_system(AppState::Playing, helper::setup_room)
+        //.add_enter_system(AppState::Playing, setup)
+        .run();
+}

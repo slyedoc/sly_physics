@@ -1,4 +1,5 @@
-use crate::{types::{Aabb, Velocity}, BOUNDS_EPS};
+use crate::aabb::Aabb;
+use crate::{types::{Velocity}, BOUNDS_EPS};
 use bevy::{math::vec3, prelude::*};
 
 use super::ColliderTrait;

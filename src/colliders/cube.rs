@@ -1,7 +1,8 @@
 use bevy::{math::vec3, prelude::*};
 
 use crate::{
-    types::{Aabb, Velocity},
+    aabb::Aabb,
+    types::{Velocity},
     BOUNDS_EPS,
 };
 

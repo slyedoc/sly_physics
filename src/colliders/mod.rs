@@ -6,7 +6,8 @@ pub use convex::*;
 pub use cube::*;
 pub use sphere::*;
 
-use crate::types::{Velocity, Aabb};
+use crate::aabb::Aabb;
+use crate::types::{Velocity};
 use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
 

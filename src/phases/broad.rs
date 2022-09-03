@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     bvh::Tlas,
-    types::{AabbWorld, BroadContact, RigidBody, Static},
+    types::{BroadContact, RigidBody, Static}, aabb::AabbWorld,
 };
 
 // Sweep and Prune

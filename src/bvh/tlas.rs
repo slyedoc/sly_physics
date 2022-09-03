@@ -1,6 +1,6 @@
 use bevy::{prelude::*};
 
-use crate::{Aabb, Bvh, BvhInstance, types::AabbWorld};
+use crate::{aabb::Aabb, Bvh, BvhInstance, aabb::AabbWorld};
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct TlasNode {

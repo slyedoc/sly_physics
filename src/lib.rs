@@ -1,4 +1,5 @@
 mod bvh;
+mod aabb;
 mod colliders;
 mod constraints;
 mod drag;
@@ -10,6 +11,7 @@ mod phases;
 mod types;
 mod utils;
 
+use aabb::AabbWorld;
 use bevy::{math::vec3, prelude::*};
 use bevy_inspector_egui::prelude::*;
 
@@ -41,7 +43,7 @@ const BOUNDS_EPS: f32 = 0.01;
 pub mod prelude {
     pub use crate::{
         bvh::Ray, bvh::Tlas, colliders::*, constraints::PenetrationArena, debug::BvhCamera,
-        debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState,
+        debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState, aabb::DebugAabbPlugin,
         dynamics::*, types::RBHelper, types::CenterOfMass, types::Elasticity,
         types::Friction, types::InertiaTensor, types::Velocity, types::Mass, types::InverseMass, types::InverseInertiaTensor,
         types::RigidBody, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState,
