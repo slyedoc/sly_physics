@@ -4,8 +4,8 @@ use bevy::{
 };
 
 use crate::{
-    aabb::Aabb,
-    types::{Velocity},
+    
+    types::*,
     BOUNDS_EPS,
 };
 

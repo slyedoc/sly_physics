@@ -1,9 +1,10 @@
 mod bvh_camera;
 pub use bvh_camera::*;
 
-use crate::aabb::{ AabbWorld};
+
 use crate::{
     bvh::Tlas, prelude::PenetrationArena, PhysicsFixedUpdate, PhysicsState, PhysicsSystems,
+    types::*,
 };
 use bevy::{pbr::NotShadowCaster, prelude::*, render::view::NoFrustumCulling};
 use iyes_loopless::prelude::*;
@@ -92,16 +93,16 @@ impl FromWorld for DebugMaterials {
 
 fn spawn_aabb_debug(
     mut commands: Commands,
-    query: Query<(Entity, &AabbWorld, &Transform), Without<AabbWorldDebug>>,
+    query: Query<(Entity, &Aabb, &Transform), Without<AabbWorldDebug>>,
     mut meshes: ResMut<Assets<Mesh>>,
     debug_material: Res<DebugMaterials>,
 ) {
-    for (e, aabb_world, _trans) in query.iter() {
+    for (e, aabb, _trans) in query.iter() {
         let id = commands
             .spawn_bundle(PbrBundle {
                 //transform: Transform::from_translation(trans.translation),
                 material: debug_material.aabb_material.clone(),
-                mesh: meshes.add(Mesh::from(&aabb_world.0)),
+                mesh: meshes.add(Mesh::from(aabb)),
                 visibility: Visibility { is_visible: true },
                 ..Default::default()
             })
@@ -116,13 +117,13 @@ fn spawn_aabb_debug(
 }
 
 pub fn update_debug(
-    query: Query<(&AabbWorldDebug, &AabbWorld)>,
+    query: Query<(&AabbWorldDebug, &Aabb)>,
     mut mesh_query: Query<&mut Handle<Mesh>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    for (target_aabb_world, aabb_world) in query.iter() {
-        if let Ok(mut aabb_world_handle) = mesh_query.get_mut(target_aabb_world.0) {
-            *aabb_world_handle = meshes.add(Mesh::from(&aabb_world.0));
+    for (target_aabb, aabb) in query.iter() {
+        if let Ok(mut aabb_world_handle) = mesh_query.get_mut(target_aabb.0) {
+            *aabb_world_handle = meshes.add(Mesh::from(aabb));
         }
         //trans_target.translation = trans_parent.translation;
     }

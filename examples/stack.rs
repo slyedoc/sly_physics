@@ -20,7 +20,7 @@ fn main() {
         .add_plugin(PhysicsDebugPlugin)
         .add_plugin(PhysicsBvhCameraPlugin)
         // testing aabb debug plugin
-        .add_plugin(DebugAabbPlugin)
+        //.add_plugin(DebugAabbPlugin)
         // local setup stuff
         .add_plugin(HelperPlugin)
         .add_plugin(CameraControllerPlugin)

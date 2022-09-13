@@ -1,6 +1,3 @@
-mod debug_render;
-pub use debug_render::*;
-
 use std::ops::{Add, AddAssign};
 
 use bevy::{    
@@ -8,18 +5,20 @@ use bevy::{
     render::{
         mesh::Indices,
         render_resource::{
-             PrimitiveTopology,
+             PrimitiveTopology, ShaderType,
         },        
-    },
+        extract_component::{ExtractComponent}
+    }, ecs::system::lifetimeless::Read,    
 };
 
 use bevy_inspector_egui::Inspectable;
 
-#[derive(Debug, Inspectable, Copy, Clone)]
+#[derive(Component, ShaderType, Debug, Inspectable,  Copy, Clone)]
 pub struct Aabb {
     pub mins: Vec3,
     pub maxs: Vec3,
 }
+
 
 impl Default for Aabb {
     fn default() -> Self {
@@ -27,6 +26,16 @@ impl Default for Aabb {
             mins: Vec3::splat(std::f32::MAX),
             maxs: Vec3::splat(std::f32::MIN),
         }
+    }
+}
+
+impl ExtractComponent for Aabb {
+    type Query = Read<Aabb>;
+
+    type Filter = ();
+
+    fn extract_component(item: bevy::ecs::query::QueryItem<Self::Query>) -> Self {
+        *item
     }
 }
 
@@ -127,6 +136,3 @@ impl Aabb {
         self.maxs - self.mins
     }
 }
-
-#[derive(Debug, Deref, DerefMut, Default, Component, Inspectable)]
-pub struct AabbWorld(pub Aabb);

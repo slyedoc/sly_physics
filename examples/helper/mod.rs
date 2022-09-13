@@ -9,9 +9,7 @@ use sly_camera_controller::CameraController;
 use sly_physics::prelude::*;
 
 use overlay::OverlayPlugin;
-
 use picking::PickingPlugin;
-
 
 pub struct HelperPlugin;
 

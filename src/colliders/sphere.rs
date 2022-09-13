@@ -1,5 +1,5 @@
-use crate::aabb::Aabb;
-use crate::{types::{Velocity}, BOUNDS_EPS};
+
+use crate::{types::*, BOUNDS_EPS};
 use bevy::{math::vec3, prelude::*};
 
 use super::ColliderTrait;
@@ -40,7 +40,7 @@ impl ColliderTrait for SphereCollider {
     }
 
     fn get_aabb(&self) -> Aabb {
-        self.aabb
+        self.aabb.clone()
     }
 
     fn get_world_aabb(

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     bvh::Tlas,
-    types::{BroadContact, RigidBody, Static}, aabb::AabbWorld,
+    types::*,
 };
 
 // Sweep and Prune
@@ -12,7 +12,7 @@ use crate::{
 #[allow(dead_code)]
 pub fn broad_phase(
     mut broad_contacts: EventWriter<BroadContact>,
-    query: Query<(Entity, &AabbWorld, Option<&Static>), With<RigidBody>>,
+    query: Query<(Entity, &Aabb, Option<&Static>), With<RigidBody>>,
 ) {
     // TODO: Yes, we are copying the array out here, only way to sort it
     // Ideally we would keep the array around, it should already near sorted
@@ -77,7 +77,7 @@ pub fn broad_phase(
 }
 
 #[allow(dead_code)]
-fn cmp_x_axis(a: &(Entity, &AabbWorld, Option<&Static>), b: &(Entity, &AabbWorld, Option<&Static>)) -> std::cmp::Ordering {
+fn cmp_x_axis(a: &(Entity, &Aabb, Option<&Static>), b: &(Entity, &Aabb, Option<&Static>)) -> std::cmp::Ordering {
     // Sort on minimum value along either x, y, or z axis
     let min_a = a.1.mins.x;
     let min_b = b.1.mins.x;
@@ -91,7 +91,7 @@ fn cmp_x_axis(a: &(Entity, &AabbWorld, Option<&Static>), b: &(Entity, &AabbWorld
 }
 
 #[allow(dead_code)]
-fn cmp_y_axis(a: &(Entity, &AabbWorld, Option<&Static>), b: &(Entity, &AabbWorld, Option<&Static>)) -> std::cmp::Ordering {
+fn cmp_y_axis(a: &(Entity, &Aabb, Option<&Static>), b: &(Entity, &Aabb, Option<&Static>)) -> std::cmp::Ordering {
     // Sort on minimum value along either x, y, or z axis
     let min_a = a.1.mins.y;
     let min_b = b.1.mins.y;
@@ -105,7 +105,7 @@ fn cmp_y_axis(a: &(Entity, &AabbWorld, Option<&Static>), b: &(Entity, &AabbWorld
 }
 
 #[allow(dead_code)]
-fn cmp_z_axis(a: &(Entity, AabbWorld, Option<&Static>), b: &(Entity, AabbWorld, Option<&Static>)) -> std::cmp::Ordering {
+fn cmp_z_axis(a: &(Entity, Aabb, Option<&Static>), b: &(Entity, Aabb, Option<&Static>)) -> std::cmp::Ordering {
     // Sort on minimum value along either x, y, or z axis
     let min_a = a.1.mins.z;
     let min_b = b.1.mins.z;

@@ -13,9 +13,9 @@ fn main() {
             ..default()
         })
         .add_plugins(DefaultPlugins)
-
         .add_plugin(WorldInspectorPlugin::default())
-        // our phsycis plugin
+        
+        // out plugins
         .add_plugin(PhysicsPlugin)
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)

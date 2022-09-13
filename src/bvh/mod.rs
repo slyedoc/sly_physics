@@ -6,7 +6,7 @@ pub use tlas::*;
 pub use tri::*;
 pub use ray::*;
 
-use crate::{aabb::Aabb, BVH_BIN_COUNT};
+use crate::{types::Aabb, BVH_BIN_COUNT};
 use bevy::{ prelude::*, reflect::TypeUuid};
 
 

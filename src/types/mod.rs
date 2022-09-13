@@ -1,5 +1,8 @@
+mod aabb;
 use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
+
+pub use aabb::*;
 
 use crate::{MAX_ANGULAR_SPEED, MAX_ANGULAR_SPEED_SQ};
 

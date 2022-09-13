@@ -1,5 +1,5 @@
 mod bvh;
-mod aabb;
+
 mod colliders;
 mod constraints;
 mod drag;
@@ -11,7 +11,6 @@ mod phases;
 mod types;
 mod utils;
 
-use aabb::AabbWorld;
 use bevy::{math::vec3, prelude::*};
 use bevy_inspector_egui::prelude::*;
 
@@ -43,8 +42,8 @@ const BOUNDS_EPS: f32 = 0.01;
 pub mod prelude {
     pub use crate::{
         bvh::Ray, bvh::Tlas, colliders::*, constraints::PenetrationArena, debug::BvhCamera,
-        debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState, aabb::DebugAabbPlugin,
-        dynamics::*, types::RBHelper, types::CenterOfMass, types::Elasticity,
+        debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState,
+        dynamics::*, types::Aabb, types::RBHelper, types::CenterOfMass, types::Elasticity,
         types::Friction, types::InertiaTensor, types::Velocity, types::Mass, types::InverseMass, types::InverseInertiaTensor,
         types::RigidBody, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState,
         PhysicsSystems, RigidBodyBundle, PHYSISCS_TIMESTEP,
@@ -62,7 +61,7 @@ pub struct RigidBodyBundle {
     pub center_of_mass: CenterOfMass,
     pub inertia_tensor: InertiaTensor,
     pub damping: Drag,
-    pub aabb_world: AabbWorld,
+    pub aabb: Aabb,
     pub inverse_inertia_tensor: InverseInertiaTensor,
     // Will be added
     // Static - if mode is static static
@@ -387,14 +386,14 @@ fn stop_step(mut commands: Commands) {
 }
 
 pub fn update_aabb(
-    mut query: Query<(&Transform, &mut AabbWorld, &Collider, &Velocity)>,
+    mut query: Query<(&Transform, &mut Aabb, &Collider, &Velocity)>,
     config: Res<PhysicsConfig>,
     collider_resources: Res<ColliderResources>,
 ) {
 
-    for (trans, mut aabb_world, collider, lin_vel) in query.iter_mut() {
+    for (trans, mut aabb, collider, lin_vel) in query.iter_mut() {
         //update aabbworld
-        aabb_world.0 = match collider {
+        *aabb = match collider {
             Collider::Sphere(index) => {
                 collider_resources
                     .get_sphere(*index)
@@ -415,7 +414,7 @@ pub fn update_aabb(
 }
 
 // TODO: both of these update system are incomplete, for now we are rebuilding every frame
-fn update_bvh(query: Query<(&Transform, &AabbWorld)>, mut tlas: ResMut<Tlas>) {
+fn update_bvh(query: Query<(&Transform, &Aabb)>, mut tlas: ResMut<Tlas>) {
     tlas.update_bvh_instances(&query);
     tlas.build();
 
