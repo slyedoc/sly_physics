@@ -556,7 +556,7 @@ fn add_point(hull_points: &mut Vec<Vec3>, hull_tris: &mut Vec<TriIndexed>, pt: V
     }
 }
 
-fn remove_unreferenced_verts(hull_points: &mut Vec<Vec3>, hull_tris: &mut Vec<TriIndexed>) {
+fn remove_unreferenced_verts(hull_points: &mut Vec<Vec3>, hull_tris: &mut [TriIndexed]) {
     // for i in 0..hull_points.len() as u32 {
     let mut i = 0;
     while i < hull_points.len() as u32 {

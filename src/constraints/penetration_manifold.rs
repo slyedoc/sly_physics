@@ -28,8 +28,9 @@ impl EntityPair {
 
 impl PartialEq for EntityPair {
     fn eq(&self, other: &Self) -> bool {
-        (self.a == other.a && self.b == other.b)
-        || (self.a == other.a && self.b == other.a)
+        //(self.a == other.a && self.b == other.b)
+        //|| (self.a == other.a && self.b == other.a)
+        (self.b == other.a || self.b == other.b) && self.a == other.a
     }
 }
 

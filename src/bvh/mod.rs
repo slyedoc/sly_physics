@@ -62,7 +62,7 @@ impl Bvh {
     // This last part is the largest reason for keeping it like this, not needing to wait on a
     // raycast event makes using it alot more friendly
     pub fn new(triangles: Vec<BvhTri>) -> Bvh {
-        assert!(triangles.len() > 0);
+        assert!(!triangles.is_empty());
         let count = triangles.len() as u32;
         let mut bvh = Bvh {
             tris: triangles,

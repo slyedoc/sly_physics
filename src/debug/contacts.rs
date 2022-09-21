@@ -225,7 +225,7 @@ impl FromWorld for ContactsMeta {
         let index_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
             usage: BufferUsages::INDEX,
             label: Some("contact_index_buffer"),
-            contents: &mesh.get_index_buffer_bytes().unwrap(),
+            contents: mesh.get_index_buffer_bytes().unwrap(),
         });
 
         let instance_buffer = render_device.create_buffer_with_data(

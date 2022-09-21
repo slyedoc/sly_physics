@@ -47,7 +47,7 @@ impl ColliderTrait for Sphere {
     }
 
     fn get_aabb(&self) -> Aabb {
-        self.aabb.clone()
+        self.aabb
     }
 
     fn get_world_aabb(

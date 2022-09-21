@@ -53,7 +53,7 @@ fn extract_entity_aabbs(
 ) {
     if current_state.0 == PhysicsDebugState::Running {
         for (entity, aabb) in query.iter() {
-            commands.get_or_spawn(entity).insert(aabb.clone());
+            commands.get_or_spawn(entity).insert(*aabb);
         }
     }
 }
@@ -76,7 +76,7 @@ fn prepare_aabbs(
     }
     aabb_uniforms
         .uniforms
-        .write_buffer(&*render_device, &*render_queue);
+        .write_buffer(&render_device, &render_queue);
 }
 
 fn queue_aabbs(

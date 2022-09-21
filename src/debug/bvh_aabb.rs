@@ -144,7 +144,7 @@ fn prepare_bvh_aabbs(
 
         aabb_meta
             .instances
-            .write_buffer(&*render_device, &*render_queue);
+            .write_buffer(&render_device, &render_queue);
     }
 }
 

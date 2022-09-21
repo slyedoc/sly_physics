@@ -1,5 +1,6 @@
-mod bvh;
+#![allow(clippy::too_many_arguments)]
 
+mod bvh;
 mod colliders;
 mod constraints;
 mod drag;

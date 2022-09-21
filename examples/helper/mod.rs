@@ -5,7 +5,7 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::{prelude::*, math::vec3};
 use iyes_loopless::prelude::*;
-use sly_camera_controller::CameraController;
+use sly_camera_controller::{CameraController, CameraControllerPlugin};
 use sly_physics::prelude::*;
 
 use overlay::OverlayPlugin;
@@ -16,6 +16,7 @@ pub struct HelperPlugin;
 impl Plugin for HelperPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(AppState::Playing)
+            .add_plugin(CameraControllerPlugin)
             .add_plugin(OverlayPlugin)
             .add_plugin(PickingPlugin)
             .add_system_to_stage( CoreStage::Update, reset_listen.run_in_state(AppState::Playing))

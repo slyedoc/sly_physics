@@ -2,7 +2,6 @@ use bevy::{math::vec3, prelude::*, window::PresentMode};
 use bevy_inspector_egui::prelude::*;
 use helper::{AppState, HelperPlugin};
 use iyes_loopless::prelude::*;
-use sly_camera_controller::*;
 use sly_physics::prelude::*;
 mod helper;
 
@@ -24,7 +23,6 @@ fn main() {
         .add_plugin(PhysicsBvhCameraPlugin)
         
         .add_plugin(HelperPlugin)
-        .add_plugin(CameraControllerPlugin)
         .add_startup_system(helper::setup_camera)
         .add_enter_system(AppState::Playing, helper::setup_room)
         .add_enter_system(AppState::Playing, setup)
