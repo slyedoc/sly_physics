@@ -15,6 +15,12 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 3
 
+[workspace]
+exclude = ["benches"]
+members = [
+    "tools/meshdata",
+]
+
 [features]
 default = ["continuous"]
 discrete = []
@@ -33,7 +39,7 @@ bytemuck = "1.12.1"
 
 [dev-dependencies]
 sly_camera_controller = { git = "https://github.com/slyedoc/sly_camera_controller", branch = "main" }
-criterion = { version = "0.3", features = ["html_reports"] }
+criterion = { version = "0.4", features = ["html_reports"] }
 image = "0.24" # only used for criterian debugging
 
 [[example]]

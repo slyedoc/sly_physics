@@ -9,7 +9,7 @@ mod helper;
 fn main() {
     App::new()
         .insert_resource(WindowDescriptor {
-            present_mode: PresentMode::Fifo,
+            present_mode: PresentMode::AutoNoVsync,
             ..default()
         })
         .add_plugins(DefaultPlugins)
@@ -18,7 +18,8 @@ fn main() {
         .add_plugin(PhysicsPlugin)
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
-        .add_plugin(PhysicsBvhCameraPlugin)
+        //.add_plugin(PhysicsBvhCameraPlugin)
+        
         // testing aabb debug plugin
         //.add_plugin(DebugAabbPlugin)
         // local setup stuff

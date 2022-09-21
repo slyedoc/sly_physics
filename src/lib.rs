@@ -42,7 +42,7 @@ const BOUNDS_EPS: f32 = 0.01;
 pub mod prelude {
     pub use crate::{
         bvh::Ray, bvh::Tlas, colliders::*, constraints::PenetrationArena, debug::BvhCamera,
-        debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState,
+        debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState, debug::DebugEntityAabbPlugin,
         dynamics::*, types::Aabb, types::RBHelper, types::CenterOfMass, types::Elasticity,
         types::Friction, types::InertiaTensor, types::Velocity, types::Mass, types::InverseMass, types::InverseInertiaTensor,
         types::RigidBody, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState,
