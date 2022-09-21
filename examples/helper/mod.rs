@@ -60,12 +60,13 @@ pub fn setup_room(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut collider_resources: ResMut<ColliderResources>,
+    mut colliders: ResMut<Assets<Collider>>,
 ) {
     let floor_size = 100.0;
     let wall_height = 10.0;
     let floor_half = floor_size * 0.5;
     let wall_height_half = wall_height * 0.5;
+    
     // floor
     commands
         .spawn_bundle(PbrBundle {
@@ -78,7 +79,7 @@ pub fn setup_room(
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
-            collider: collider_resources.add_box(vec3(floor_size, 1.0, floor_size)),
+            collider: colliders.add(Collider::from(Box::new(vec3(floor_size, 1.0, floor_size)))),
             mode: RigidBody::Static,
             ..default()
         })
@@ -103,7 +104,7 @@ pub fn setup_room(
                 ..default()
             })
             .insert_bundle(RigidBodyBundle {
-                collider: collider_resources.add_box(vec3(floor_size, wall_height, 1.0)),
+                collider: colliders.add(Collider::from(Box::new(vec3(floor_size, wall_height, 1.0)))),
                 mode: RigidBody::Static,
                 ..default()
             })

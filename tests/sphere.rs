@@ -12,8 +12,8 @@ fn did_sphere_fall() {
 
     app.add_startup_system(spawn_ground);
 
-    let mut collider_resources = app.world.get_resource_mut::<ColliderResources>().unwrap();
-    let sphere_collider = collider_resources.add_sphere(0.5);
+    let mut colliders = app.world.get_resource_mut::<Assets<Collider>>().unwrap();
+    let sphere_collider = colliders.add(Collider::from(Sphere::new(0.5)));
     let id = app
         .world
         .spawn()
@@ -41,7 +41,7 @@ fn did_sphere_fall() {
 
 fn spawn_ground(
     mut commands: Commands,
-    mut collider_resources: ResMut<ColliderResources>,
+    mut colliders: ResMut<Assets<Collider>>,
 ) {
 
     commands
@@ -50,7 +50,7 @@ fn spawn_ground(
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
-            collider: collider_resources.add_box(vec3(10.0, 1.0, 10.0)),
+            collider: colliders.add(Collider::from(Box::new(vec3(10.0, 1.0, 10.0)))),
             mode: RigidBody::Static,
             elasticity: Elasticity(1.0),
             ..default()

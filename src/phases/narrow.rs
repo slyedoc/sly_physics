@@ -6,7 +6,7 @@ use crate::{colliders::*, constraints::PenetrationArena, intersect::*, types::*,
 pub fn narrow_phase(
     mut query: Query<(
         &mut Transform,
-        &Collider,        
+        &Handle<Collider>,        
         &mut Velocity,
         &CenterOfMass,
         &InertiaTensor,
@@ -15,23 +15,22 @@ pub fn narrow_phase(
     mut contacts: EventWriter<Contact>,
     mut manifold_arean: ResMut<PenetrationArena>,
     config: Res<PhysicsConfig>,
-    collider_resources: Res<ColliderResources>,
+    colliders: Res<Assets<Collider>>,
 ) {
 
     for pair in broad_contacts.iter() {
         let bodies = query.get_many_mut([pair.a, pair.b]);
-        let [(mut trans_a, type_a, mut vel_a, com_a, i_tensor_a), (mut trans_b, type_b, mut vel_b, com_b, i_tensor_b)] =
+        let [(mut trans_a, col_a, mut vel_a, com_a, i_tensor_a), (mut trans_b, col_b, mut vel_b, com_b, i_tensor_b)] =
             bodies.unwrap();
 
         // TODO: ideally we can use different collision test between different shapes, for now really only sphere sphere has its own
         // and due to avoiding dynamic dispatching we have split everything out, in hind sight we really should have just started with dynamic dispatching
         // and removed it later if testing show it was faster, at this point I may not be and it does create alot of boiler plate and code dupilication
+        let collider_a = colliders.get(col_a).unwrap();
+        let collider_b = colliders.get(col_b).unwrap();
 
-        if let Some(contact) = match (type_a, type_b) {
-            (Collider::Sphere(sphere_a_handle), Collider::Sphere(sphere_b_handle)) => {
-                let sphere_a = collider_resources.get_sphere(*sphere_a_handle);
-                let sphere_b = collider_resources.get_sphere(*sphere_b_handle);
-
+        if let Some(contact) = match (collider_a, collider_b) {
+            (Collider::Sphere(sphere_a), Collider::Sphere(sphere_b)) => {
                 if let Some((world_point_a, world_point_b, time_of_impact)) = sphere_sphere_dynamic(
                     sphere_a.radius,
                     sphere_b.radius,
@@ -99,16 +98,15 @@ pub fn narrow_phase(
                     None
                 }
             }
-            (Collider::Box(box_a_index), Collider::Box(box_b_index)) => {
-                let cube_a = collider_resources.get_cube(*box_a_index);
-                let cube_b = collider_resources.get_cube(*box_b_index);
-                conservative_advancement::<BoxCollider, BoxCollider>(
-                    cube_a,
+            (collider_a, collider_b) => {
+
+                conservative_advancement(
+                    collider_a,
                     &mut trans_a,
                     &mut vel_a,
                     com_a,
                     i_tensor_a,
-                    cube_b,
+                    collider_b,
                     &mut trans_b,
                     &mut vel_b,
                     com_b,
@@ -117,132 +115,7 @@ pub fn narrow_phase(
                     config.time,
                 )
             }
-            (Collider::Sphere(sphere_index), Collider::Box(box_index)) => {
-                let sphere_a = collider_resources.get_sphere(*sphere_index);
-                let cube = collider_resources.get_cube(*box_index);
-                conservative_advancement::<SphereCollider, BoxCollider>(
-                    sphere_a,
-                    &mut trans_a,
-                    &mut vel_a,
-                    com_a,
-                    i_tensor_a,
-                    cube,
-                    &mut trans_b,
-                    &mut vel_b,
-                    com_b,
-                    i_tensor_b,
-                    pair,
-                    config.time,
-                )
-            }
-            (Collider::Box(cube_index), Collider::Sphere(sphere_index)) => {
-                let sphere = collider_resources.get_sphere(*sphere_index);
-                let cube = collider_resources.get_cube(*cube_index);
-                conservative_advancement::<BoxCollider, SphereCollider>(
-                    cube,
-                    &mut trans_a,
-                    &mut vel_a,
-                    com_a,
-                    i_tensor_a,
-                    sphere,
-                    &mut trans_b,
-                    &mut vel_b,
-                    com_b,
-                    i_tensor_b,
-                    pair,
-                    config.time,
-                )
-            }
-            (Collider::Sphere(sphere_index), Collider::Convex(convex_index)) => {
-                let sphere = collider_resources.get_sphere(*sphere_index);
-                let convex = collider_resources.get_convex(*convex_index);
-                conservative_advancement::<SphereCollider, ConvexCollider>(
-                    sphere,
-                    &mut trans_a,
-                    &mut vel_a,
-                    com_a,
-                    i_tensor_a,
-                    convex,
-                    &mut trans_b,
-                    &mut vel_b,
-                    com_b,
-                    i_tensor_b,
-                    pair,
-                    config.time,
-                )
-            }
-            (Collider::Box(cube_index), Collider::Convex(convex_index)) => {
-                let cube = collider_resources.get_cube(*cube_index);
-                let convex = collider_resources.get_convex(*convex_index);
-                conservative_advancement::<BoxCollider, ConvexCollider>(
-                    cube,
-                    &mut trans_a,
-                    &mut vel_a,
-                    com_a,
-                    i_tensor_a,
-                    convex,
-                    &mut trans_b,
-                    &mut vel_b,
-                    com_b,
-                    i_tensor_b,
-                    pair,
-                    config.time,
-                )
-            }
-            (Collider::Convex(convex_index), Collider::Sphere(sphere_index)) => {
-                let convex = collider_resources.get_convex(*convex_index);
-                let sphere = collider_resources.get_sphere(*sphere_index);
-                conservative_advancement::<ConvexCollider, SphereCollider>(
-                    convex,
-                    &mut trans_a,
-                    &mut vel_a,
-                    com_a,
-                    i_tensor_a,
-                    sphere,
-                    &mut trans_b,
-                    &mut vel_b,
-                    com_b,
-                    i_tensor_b,
-                    pair,
-                    config.time,
-                )
-            }
-            (Collider::Convex(convex_index), Collider::Box(cube_index)) => {
-                let convex = collider_resources.get_convex(*convex_index);
-                let cube = collider_resources.get_cube(*cube_index);
-                conservative_advancement::<ConvexCollider, BoxCollider>(
-                    convex,
-                    &mut trans_a,
-                    &mut vel_a,
-                    com_a,
-                    i_tensor_a,
-                    cube,
-                    &mut trans_b,
-                    &mut vel_b,
-                    com_b,
-                    i_tensor_b,
-                    pair,
-                    config.time,
-                )
-            }
-            (Collider::Convex(convex_index_a), Collider::Convex(convex_index_b)) => {
-                let convex_a = collider_resources.get_convex(*convex_index_a);
-                let convex_b = collider_resources.get_convex(*convex_index_b);
-                conservative_advancement::<ConvexCollider, ConvexCollider>(
-                    convex_a,
-                    &mut trans_a,
-                    &mut vel_a,
-                    com_a,
-                    i_tensor_a,
-                    convex_b,
-                    &mut trans_b,
-                    &mut vel_b,
-                    com_b,
-                    i_tensor_b,
-                    pair,
-                    config.time,
-                )
-            }
+
         } {
             if contact.time_of_impact == 0.0 {
                 manifold_arean.add_contact(contact, &trans_a, com_a, &trans_b, com_b);
@@ -255,15 +128,15 @@ pub fn narrow_phase(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
+fn conservative_advancement(
     // Shape A
-    shape_a: &T,
+    shape_a: &Collider,
     trans_a: &mut Transform,
     vel_a: &mut Velocity,
     com_a: &CenterOfMass,
     i_tensor_a: &InertiaTensor,
     // Shape B
-    shape_b: &K,
+    shape_b: &Collider,
     trans_b: &mut Transform,
     vel_b: &mut Velocity,    
     com_b: &CenterOfMass,
@@ -283,7 +156,7 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
         const BIAS: f32 = 0.001;
 
         if let Some((mut world_point_a, mut world_point_b)) =
-            gjk_does_intersect::<T, K>(shape_a, trans_a, shape_b, trans_b, BIAS)
+            gjk_does_intersect(shape_a, trans_a, shape_b, trans_b, BIAS)
         {
             let normal = (world_point_b - world_point_a).normalize_or_zero();
             world_point_a -= normal * BIAS;
@@ -310,7 +183,7 @@ fn conservative_advancement<T: ColliderTrait, K: ColliderTrait>(
 
         // advance based on closest point
         let (world_point_a, world_point_b) =
-            gjk_closest_points::<T, K>(shape_a, trans_a, shape_b, trans_b);
+            gjk_closest_points(shape_a, trans_a, shape_b, trans_b);
         let separation_dist = (world_point_a - world_point_b).length();
 
         // get the vector from the closest point on A to the closest point on B

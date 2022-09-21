@@ -5,7 +5,7 @@ A ECS Bevy physics plugin.
 
 Most likely you should go use rapier, this is a moon shot.
 
-This is where I am teaching myself what goes into a physiscs engine, the goal is having a working physics engine in one crate, that's good only for games, and easy to use.  Hope to focus on performance.
+This is where I am teaching myself what goes into a physics engine, the goal is having a working physics engine in one crate, that's good only for games, and easy to use.  Hope to focus on performance as I go.
 
 # Why
 

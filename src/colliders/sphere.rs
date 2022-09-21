@@ -4,14 +4,21 @@ use bevy::{math::vec3, prelude::*};
 
 use super::ColliderTrait;
 
-pub struct SphereCollider {
+#[derive(Debug)]
+pub struct Sphere {
     pub radius: f32,
     aabb: Aabb,
     center_of_mass: Vec3,
     inertia_tensor: Mat3,
 }
 
-impl SphereCollider {
+impl Default for Sphere {
+    fn default() -> Self {
+        Self::new(0.5)
+    }
+}
+
+impl Sphere {
     pub fn new(radius: f32) -> Self {
         let aabb = Aabb {
             mins: vec3(-radius, -radius, -radius),
@@ -21,7 +28,7 @@ impl SphereCollider {
         let i = 2.0 * radius * radius / 5.0;
         let inertia_tensor = Mat3::from_diagonal(Vec3::splat(i));
 
-        SphereCollider {
+        Sphere {
             radius,
             aabb,
             center_of_mass: vec3(0.0, 0.0, 0.0),
@@ -30,7 +37,7 @@ impl SphereCollider {
     }
 }
 
-impl ColliderTrait for SphereCollider {
+impl ColliderTrait for Sphere {
     fn get_center_of_mass(&self) -> Vec3 {
         self.center_of_mass
     }

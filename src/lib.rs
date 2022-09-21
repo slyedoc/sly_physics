@@ -53,7 +53,7 @@ pub mod prelude {
 #[derive(Bundle, Default)]
 pub struct RigidBodyBundle {
     pub mode: RigidBody,
-    pub collider: Collider,
+    pub collider: Handle<Collider>,
     pub mass: Mass,
     pub velocity: Velocity,
     pub elasticity: Elasticity,
@@ -118,10 +118,10 @@ pub struct PhysicsPlugin;
 impl Plugin for PhysicsPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(PhysicsState::Running)
+            .add_asset::<Collider>()
             .add_event::<BroadContact>()
             .add_event::<Contact>()
             .init_resource::<PhysicsConfig>()
-            .init_resource::<ColliderResources>()
             .init_resource::<PenetrationArena>()
             .init_resource::<Tlas>()
             .add_stage_after(
@@ -294,17 +294,17 @@ pub fn spawn(
     mut query: Query<
         (
             Entity,
-            &Collider,
+            &Handle<Collider>,
             &RigidBody,
             &mut Mass,
             &mut CenterOfMass,
             &mut InertiaTensor,
             &mut InverseInertiaTensor,
         ),
-        Added<Collider>,
+        Added<Handle<Collider>>,
     >,
     mut tlas: ResMut<Tlas>,
-    collider_resources: Res<ColliderResources>,
+    colliders: Res<Assets<Collider>>,
 ) {
     for (
         e,
@@ -316,6 +316,8 @@ pub fn spawn(
         mut inverse_inertia_tensor,
     ) in query.iter_mut()
     {
+        let collider = colliders.get(collider).unwrap();
+
         // Setup RigidBody components
         let is_static = match rb_mode {
             RigidBody::Static => {
@@ -337,8 +339,7 @@ pub fn spawn(
         commands.entity(e).insert(InverseMass(inv_mass));
 
         match collider {
-            Collider::Sphere(index) => {
-                let sphere = collider_resources.get_sphere(*index);
+            Collider::Sphere(sphere) => {
                 center_of_mass.0 = sphere.get_center_of_mass();
                 inertia_tensor.0 = sphere.get_inertia_tensor();
                 inverse_inertia_tensor.0 = inertia_tensor.0.inverse() * inv_mass;
@@ -354,19 +355,17 @@ pub fn spawn(
                 let bvh_index = tlas.add_bvh(Bvh::new(bvh_tri));
                 tlas.add_instance(BvhInstance::new(e, bvh_index));
             }
-            Collider::Box(index) => {
-                let cube = collider_resources.get_cube(*index);
-                center_of_mass.0 = cube.get_center_of_mass();
-                inertia_tensor.0 = cube.get_inertia_tensor();
+            Collider::Box(b) => {
+                center_of_mass.0 = b.get_center_of_mass();
+                inertia_tensor.0 = b.get_inertia_tensor();
                 inverse_inertia_tensor.0 = inertia_tensor.0.inverse() * inv_mass;
 
-                let bvh_mesh = Mesh::from(shape::Box::new(cube.size.x, cube.size.y, cube.size.z));
+                let bvh_mesh = Mesh::from(shape::Box::new(b.size.x, b.size.y, b.size.z));
                 let bvh_tri = parse_bvh_mesh(&bvh_mesh);
                 let bvh_index = tlas.add_bvh(Bvh::new(bvh_tri));
                 tlas.add_instance(BvhInstance::new(e, bvh_index));
             }
-            Collider::Convex(index) => {
-                let convex = collider_resources.get_convex(*index);
+            Collider::Convex(convex) => {                
                 center_of_mass.0 = convex.get_center_of_mass();
                 inertia_tensor.0 = convex.get_inertia_tensor();
                 inverse_inertia_tensor.0 = inertia_tensor.0.inverse() * inv_mass;
@@ -386,30 +385,14 @@ fn stop_step(mut commands: Commands) {
 }
 
 pub fn update_aabb(
-    mut query: Query<(&Transform, &mut Aabb, &Collider, &Velocity)>,
+    mut query: Query<(&Transform, &mut Aabb, &Handle<Collider>, &Velocity)>,
     config: Res<PhysicsConfig>,
-    collider_resources: Res<ColliderResources>,
+    colliders: Res<Assets<Collider>>,
 ) {
 
-    for (trans, mut aabb, collider, lin_vel) in query.iter_mut() {
-        //update aabbworld
-        *aabb = match collider {
-            Collider::Sphere(index) => {
-                collider_resources
-                    .get_sphere(*index)
-                    .get_world_aabb(trans, lin_vel, config.time)
-            }
-            Collider::Box(index) => {
-                collider_resources
-                    .get_cube(*index)
-                    .get_world_aabb(trans, lin_vel, config.time)
-            }
-            Collider::Convex(index) => {
-                collider_resources
-                    .get_convex(*index)
-                    .get_world_aabb(trans, lin_vel, config.time)
-            }
-        };
+    for (trans, mut aabb, col, lin_vel) in query.iter_mut() {
+        let collider = colliders.get(col).unwrap();
+        *aabb = collider.get_world_aabb(trans, lin_vel, config.time);         
     }
 }
 

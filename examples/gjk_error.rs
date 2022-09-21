@@ -7,6 +7,8 @@ use sly_physics::prelude::*;
 mod helper;
 
 fn main() {
+
+
     App::new()
         .insert_resource(WindowDescriptor {
             present_mode: PresentMode::Fifo,
@@ -27,16 +29,22 @@ fn main() {
         .add_enter_system(AppState::Playing, helper::setup_room)
         .add_enter_system(AppState::Playing, setup)
         .run();
+
+        
 }
 
 pub fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut collider_resources: ResMut<ColliderResources>,
+    mut colliders: ResMut<Assets<Collider>>,
     asset_server: Res<AssetServer>,
 ) {
-    let box_a = collider_resources.add_box(Vec3::ONE);
+
+
+    error!("This example fails, using it to track down an error!");
+
+    let box_a = colliders.add(Collider::from(Box::new(Vec3::ONE)));
     let box_mesh = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
     let box_mat = materials.add(StandardMaterial {
         base_color_texture: Some(asset_server.load("checker_red.png")),

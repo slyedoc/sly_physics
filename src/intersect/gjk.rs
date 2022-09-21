@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{colliders::ColliderTrait, math::Mat4Ext};
+use crate::{colliders::ColliderTrait, math::Mat4Ext, prelude::Collider};
 
 // TODO: REMOVE THIS, HUGE HACK, added for bevy jam
 const GKJ_LOOP_LIMIT: u32 = 100;
@@ -35,10 +35,10 @@ impl PartialEq for Edge {
 
 impl Eq for Edge {}
 
-pub fn gjk_does_intersect<T: ColliderTrait, K: ColliderTrait>(
-    collider_a: &T,
+pub fn gjk_does_intersect(
+    collider_a: &Collider,
     trans_a: &Transform,
-    collider_b: &K,
+    collider_b: &Collider,
     trans_b: &Transform,
     bias: f32,
 ) -> Option<(Vec3, Vec3)> {
@@ -294,10 +294,10 @@ fn epa_expand<T: ColliderTrait, K: ColliderTrait>(
     Some((pt_on_a, pt_on_b))
 }
 
-pub fn gjk_closest_points<T: ColliderTrait, K: ColliderTrait>(
-    collider_a: &T,
+pub fn gjk_closest_points(
+    collider_a: &Collider,
     trans_a: &Transform,
-    collider_b: &K,
+    collider_b: &Collider,
     trans_b: &Transform,
 ) -> (Vec3, Vec3) {
     let mut closest_dist = f32::MAX;

@@ -1,84 +1,33 @@
 mod convex;
-mod cube;
+mod r#box;
 mod sphere;
 
 pub use convex::*;
-pub use cube::*;
+pub use r#box::*;
 pub use sphere::*;
 
+use enum_dispatch::*;
 use crate::types::*;
-use bevy::prelude::*;
-use bevy_inspector_egui::Inspectable;
+use bevy::{prelude::*, reflect::TypeUuid};
 
 
-#[derive(Component, Clone, Inspectable, Debug)]
+#[derive(Debug, TypeUuid)]
+#[uuid = "241fb60c-c542-4043-a574-a8b28bb3761d"]
+#[enum_dispatch]
 pub enum Collider {
-    Sphere(usize),
-    Box(usize),
-    Convex(usize),
+    Sphere(Sphere),
+    Box(Box),
+    Convex(Convex),
 }
 
 impl Default for Collider {
     fn default() -> Self {
-        Collider::Sphere(0)
+        Collider::Sphere(Sphere::default())
     }
 }
 
-impl Collider {
-    pub fn index(&self) -> usize {
-        match self {
-            Collider::Sphere(index) => *index,
-            Collider::Box(index) => *index,
-            Collider::Convex(index) => *index,
-        }
-    }
-}
 
-pub struct ColliderResources {
-    spheres: Vec<SphereCollider>,
-    boxes: Vec<BoxCollider>,
-    convexs: Vec<ConvexCollider>,
-}
-
-impl Default for ColliderResources {
-    fn default() -> Self {
-        ColliderResources {
-            spheres: vec![SphereCollider::new(0.5)], // adding a instance for a default value
-            boxes: Vec::new(),
-            convexs: Vec::new(),
-        }
-    }
-}
-
-impl ColliderResources {
-    pub fn add_sphere(&mut self, radius: f32) -> Collider {
-        self.spheres.push(SphereCollider::new(radius));
-        Collider::Sphere(self.spheres.len() - 1)
-    }
-
-    pub fn get_sphere(&self, index: usize) -> &SphereCollider {
-        &self.spheres[index]
-    }
-
-    pub fn add_box(&mut self, size: Vec3) -> Collider {
-        self.boxes.push(BoxCollider::new(size));
-        Collider::Box(self.boxes.len() - 1)
-    }
-
-    pub fn get_cube(&self, index: usize) -> &BoxCollider {
-        &self.boxes[index]
-    }
-
-    pub fn add_convex(&mut self, verts: &[Vec3]) -> Collider {
-        self.convexs.push(ConvexCollider::new(verts));
-        Collider::Convex(self.convexs.len() - 1)
-    }
-
-    pub fn get_convex(&self, index: usize) -> &ConvexCollider {
-        &self.convexs[index]
-    }
-}
-
+#[enum_dispatch(Collider)]
 pub trait ColliderTrait {
     fn get_center_of_mass(&self) -> Vec3;
     fn get_inertia_tensor(&self) -> Mat3;

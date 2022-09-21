@@ -7,6 +7,9 @@ description = "A native physics engine for Bevy"
 readme = "README.md"
 repository = "https://github.com/slyedoc/sly_physics"
 
+[lib]
+bench = false
+
 # Enable only a small amount of optimization in debug mode
 [profile.dev]
 opt-level = 1
@@ -33,9 +36,10 @@ trace = ["bevy/trace", "bevy/trace_chrome"]
 
 [dependencies]
 bevy =  { version = "0.8.1" }
-bevy-inspector-egui = { version = "0.12.1" }
+bevy-inspector-egui = { version = "0.13.0" }
 iyes_loopless = { version = "0.7.1" }
 bytemuck = "1.12.1"
+enum_dispatch = "0.3.8"
 
 [dev-dependencies]
 sly_camera_controller = { git = "https://github.com/slyedoc/sly_camera_controller", branch = "main" }

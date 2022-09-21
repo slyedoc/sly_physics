@@ -9,7 +9,7 @@ use crate::{
 use super::{fastest_linear_speed, find_support_point, ColliderTrait};
 
 #[derive(Debug)]
-pub struct BoxCollider {
+pub struct Box {
     pub size: Vec3,
     pub verts: Vec<Vec3>,
     pub center_of_mass: Vec3,
@@ -17,7 +17,7 @@ pub struct BoxCollider {
     pub inertia_tensor: Mat3,
 }
 
-impl BoxCollider {
+impl Box {
     pub fn new(size: Vec3) -> Self {
         let half_size = size * 0.5;
         let aabb = Aabb {
@@ -50,7 +50,7 @@ impl BoxCollider {
         // together
         let inertia_tensor = tensor + pat_tensor;
 
-        BoxCollider {
+        Box {
             size,
             verts: vec![
                 Vec3::new(-half_size.x, -half_size.y, -half_size.z),
@@ -69,7 +69,7 @@ impl BoxCollider {
     }
 }
 
-impl ColliderTrait for BoxCollider {
+impl ColliderTrait for Box {
     fn get_center_of_mass(&self) -> Vec3 {
         self.center_of_mass
     }

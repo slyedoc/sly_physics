@@ -19,7 +19,6 @@ fn main() {
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
         //.add_plugin(PhysicsBvhCameraPlugin)
-        
         // testing aabb debug plugin
         //.add_plugin(DebugAabbPlugin)
         // local setup stuff
@@ -56,7 +55,7 @@ pub enum StackMode {
 impl Default for Stack {
     fn default() -> Self {
         Self {
-            count: (4, 4, 4),
+            count: (10, 10, 10),
             spacing: 1.1,
             time_scale: 1.0,
             mode: StackMode::Cube,
@@ -71,15 +70,29 @@ pub fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
     stack: Res<Stack>,
-    mut collider_resources: ResMut<ColliderResources>,
+    mut colliders: ResMut<Assets<Collider>>,
 ) {
     // Stack
     let radius = 0.5;
     let size = stack.count;
 
-    let collider = match stack.mode {
-        StackMode::Sphere => collider_resources.add_sphere(radius),
-        StackMode::Cube => collider_resources.add_box(Vec3::splat(1.0)),
+    let mat = materials.add(StandardMaterial {
+        base_color_texture: Some(asset_server.load("checker_red.png")),
+        ..default()
+    });
+
+    let (mesh, collider) = match stack.mode {
+        StackMode::Sphere => (
+            meshes.add(Mesh::from(shape::UVSphere {
+                radius,
+                ..default()
+            })),
+            colliders.add(Collider::from(Sphere::new(radius))),
+        ),
+        StackMode::Cube => (
+            meshes.add(Mesh::from(shape::Box::new(1.0, 1.0, 1.0))),
+            colliders.add(Collider::from(Box::new(Vec3::splat(1.0)))),
+        ),
     };
 
     for i in 0..size.0 {
@@ -92,19 +105,8 @@ pub fn setup(
                 ) * stack.spacing;
                 commands
                     .spawn_bundle(PbrBundle {
-                        mesh: match stack.mode {
-                            StackMode::Sphere => meshes.add(Mesh::from(shape::UVSphere {
-                                radius,
-                                ..default()
-                            })),
-                            StackMode::Cube => {
-                                meshes.add(Mesh::from(shape::Box::new(1.0, 1.0, 1.0)))
-                            }
-                        },
-                        material: materials.add(StandardMaterial {
-                            base_color_texture: Some(asset_server.load("checker_red.png")),
-                            ..default()
-                        }),
+                        mesh: mesh.clone(),
+                        material: mat.clone(),
                         transform: Transform::from_translation(pos),
                         ..default()
                     })
@@ -140,7 +142,7 @@ pub fn setup(
                 linear: vec3(-stack.ball_velocity, 0.0, 0.0),
                 ..default()
             },
-            collider: collider_resources.add_sphere(wreak_ball_radius),
+            collider: colliders.add(Collider::from(Sphere::new(wreak_ball_radius))),
             mass: Mass(20.0),
             ..default()
         })
@@ -149,14 +151,14 @@ pub fn setup(
     // Diamond
 
     let diamond = make_diamond_convex_shape();
+    let diamond_convex_collider = Convex::new(&diamond);
+    let diamond_mesh = Mesh::from(&diamond_convex_collider);
 
-    let diamond_collider_index = collider_resources.add_convex(&diamond);
-    let diamond_collider = collider_resources.get_convex(diamond_collider_index.index());
 
     commands
         .spawn_bundle(PbrBundle {
-            transform: Transform::from_xyz(30.0, wreak_ball_radius + 1.0, 0.0),
-            mesh: meshes.add(Mesh::from(diamond_collider.clone())),
+            transform: Transform::from_xyz(30.0, wreak_ball_radius + 1.0, 10.0),
+            mesh: meshes.add(Mesh::from(diamond_mesh)),
             material: materials.add(StandardMaterial {
                 base_color: Color::rgb(0.0, 0.0, 1.0),
                 ..default()
@@ -164,7 +166,7 @@ pub fn setup(
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
-            collider: diamond_collider_index,
+            collider: colliders.add(Collider::from(diamond_convex_collider)),
             mass: Mass(2.0),
             ..default()
         })

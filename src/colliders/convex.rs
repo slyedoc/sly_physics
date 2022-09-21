@@ -12,7 +12,7 @@ use crate::{
 use super::{fastest_linear_speed, find_support_point, ColliderTrait};
 
 #[derive(Debug)]
-pub struct ConvexCollider {
+pub struct Convex {
     verts: Vec<Vec3>,
     tris: Vec<TriIndexed>,
     bounds: Aabb,
@@ -20,14 +20,14 @@ pub struct ConvexCollider {
     inertia_tensor: Mat3,
 }
 
-impl ConvexCollider {
+impl Convex {
     pub fn new(verts: &[Vec3]) -> Self {
         let (hull_pts, hull_tris) = build_convex_hull(verts);
         let bounds = Aabb::from_points(&hull_pts);
         let centre_of_mass = calculate_center_of_mass(&hull_pts, &hull_tris);
         let inertia_tensor = calculate_inertia_tensor(&hull_pts, &hull_tris, centre_of_mass);
 
-        ConvexCollider {
+        Convex {
             verts: hull_pts,
             tris: hull_tris,
             bounds,
@@ -38,8 +38,8 @@ impl ConvexCollider {
 }
 
 // TODO: made this flat normals for the bevy jam
-impl From<&ConvexCollider> for Mesh {
-    fn from(collider: &ConvexCollider) -> Self {
+impl From<&Convex> for Mesh {
+    fn from(collider: &Convex) -> Self {
         let mut verts: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len() * 3);
         let mut normals: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len() * 3);
         let mut indices: Vec<u32> = Vec::with_capacity(collider.tris.len() * 3);
@@ -130,7 +130,7 @@ impl From<&ConvexCollider> for Mesh {
 //     }
 // }
 
-impl ColliderTrait for ConvexCollider {
+impl ColliderTrait for Convex {
     fn get_center_of_mass(&self) -> Vec3 {
         self.center_of_mass
     }

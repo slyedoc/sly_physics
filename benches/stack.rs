@@ -4,38 +4,45 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use sly_physics::prelude::*;
 use std::{f32::consts::FRAC_PI_2, time::Duration};
 
-fn stack_sphere_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("sphere_stack");
+fn stack_benchmark(c: &mut Criterion) {
+    for item in [StackItem::Cube, StackItem::Sphere] {
+        let mut group = c.benchmark_group(format!("stack_{}", item));
 
-    for (size, time) in [(100, 15), (500, 40), (1000, 120), (2000, 300)].iter() {
-        group.measurement_time(Duration::from_secs(*time));
-        group.throughput(Throughput::Elements(*size as u64));
-        group.sample_size(10);
-        group.bench_with_input(BenchmarkId::from_parameter(size), size, |bencher, &size| {
-            bencher.iter(|| {
-                let mut app = App::new();
-                app.insert_resource(WindowDescriptor {
-                    present_mode: PresentMode::Immediate,
-                    ..default()
-                })
-                .add_plugins(BenchPlugins)
-                // our plugins
-                .add_plugin(PhysicsPlugin)
-                .add_plugin(GravityPlugin)
-                .insert_resource(StackSize(size))
-                // setup environment
-                .add_startup_system(spawn_camera)
-                .add_startup_system(spawn_room)
-                .add_startup_system(spawn_stack);
+        for (size, time) in [(100, 15), (500, 40)].iter() {
+            //(1000, 120), (2000, 300)
+            group.measurement_time(Duration::from_secs(*time));
+            group.throughput(Throughput::Elements(*size as u64));
+            group.sample_size(10);
+            group.bench_with_input(BenchmarkId::from_parameter(size), size, |bencher, &size| {
+                bencher.iter(|| {
+                    let mut app = App::new();
+                    app.insert_resource(WindowDescriptor {
+                        present_mode: PresentMode::Immediate,
+                        ..default()
+                    })
+                    .add_plugins(BenchPlugins)
+                    // our plugins
+                    .add_plugin(PhysicsPlugin)
+                    .add_plugin(GravityPlugin)
+                    .insert_resource(StackConfig {
+                        size,
+                        item,
+                    })
+                    // setup environment
+                    .add_startup_system(spawn_camera)
+                    .add_startup_system(spawn_room)
+                    .add_startup_system(spawn_stack);
 
-                // run for what would be 5 seconds at 60 fps
-                for _ in 0..(60 * 5) {
-                    app.update();
-                }
+                    // run for what would be 5 seconds at 60 fps
+                    for _ in 0..(60 * 5) {
+                        app.update();
+                    }
+                });
             });
-        });
+        }
+
+        group.finish();
     }
-    group.finish();
 }
 
 fn spawn_camera(mut commands: Commands) {
@@ -45,37 +52,68 @@ fn spawn_camera(mut commands: Commands) {
     });
 
     // light
-    commands
-        .spawn_bundle(DirectionalLightBundle {
-            directional_light: DirectionalLight {
-                shadows_enabled: true,
-                ..default()
-            },
-            transform: Transform::from_xyz(50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
+    commands.spawn_bundle(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            shadows_enabled: true,
             ..default()
-        });
+        },
+        transform: Transform::from_xyz(50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ..default()
+    });
 }
 
-struct StackSize(usize);
+#[derive(Copy, Clone)]
+enum StackItem {
+    Sphere,
+    Cube,
+}
+
+impl std::fmt::Display for StackItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StackItem::Sphere => write!(f, "sphere"),
+            StackItem::Cube => write!(f, "cube"),
+        }
+    }
+}
+
+
+struct StackConfig {
+    size: usize,
+    item: StackItem,
+}
+
 fn spawn_stack(
     mut commands: Commands,
-    mut collider_resources: ResMut<ColliderResources>,
+    mut colliders: ResMut<Assets<Collider>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    stack_size: Res<StackSize>,
+    config: Res<StackConfig>,
 ) {
     // Stack
     let radius = 0.5;
     let spacing = 1.0;
 
-    let collider = collider_resources.add_sphere(radius);
-    let sphere_mat = materials.add(StandardMaterial {
+    let collider = match config.item {
+        StackItem::Sphere => colliders.add(Collider::from(Sphere::new(radius))),
+        StackItem::Cube => colliders.add(Collider::from(Box::new(Vec3::splat(radius * 1.9)))),
+    };
+
+    let mat = materials.add(StandardMaterial {
         base_color: Color::rgb(1.0, 0.0, 0.0).into(),
         ..default()
     });
 
+    let mesh = match config.item {
+        StackItem::Sphere => meshes.add(Mesh::from(shape::UVSphere {
+            radius,
+            ..default()
+        })),
+        StackItem::Cube => meshes.add(Mesh::from(shape::Cube { size: radius * 2.0 })),
+    };
+
     let count = 0;
-    let size = (stack_size.0 as f32).powf(1.0 / 3.0).ceil() as usize;
+    let size = (config.size as f32).powf(1.0 / 3.0).ceil() as usize;
 
     for i in 0..size {
         for j in 0..size {
@@ -87,11 +125,8 @@ fn spawn_stack(
                 ) * spacing;
                 commands
                     .spawn_bundle(PbrBundle {
-                        mesh: meshes.add(Mesh::from(shape::UVSphere {
-                            radius,
-                            ..default()
-                        })),
-                        material: sphere_mat.clone(),
+                        mesh: mesh.clone(),
+                        material: mat.clone(),
                         transform: Transform::from_translation(pos),
                         ..default()
                     })
@@ -99,7 +134,7 @@ fn spawn_stack(
                         collider: collider.clone(),
                         ..default()
                     });
-                if count == stack_size.0 {
+                if count == config.size {
                     return;
                 }
             }
@@ -111,7 +146,7 @@ pub fn spawn_room(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut collider_resources: ResMut<ColliderResources>,
+    mut colliders: ResMut<Assets<Collider>>,
 ) {
     let floor_size = 100.0;
     let wall_height = 10.0;
@@ -129,7 +164,7 @@ pub fn spawn_room(
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
-            collider: collider_resources.add_box(vec3(floor_size, 1.0, floor_size)),
+            collider: colliders.add(Collider::from(Box::new(vec3(floor_size, 1.0, floor_size)))),
             mode: RigidBody::Static,
             ..default()
         })
@@ -156,7 +191,7 @@ pub fn spawn_room(
                 ..default()
             })
             .insert_bundle(RigidBodyBundle {
-                collider: collider_resources.add_box(vec3(floor_size, wall_height, 1.0)),
+                collider: colliders.add(Collider::from(Box::new(vec3(floor_size, wall_height, 1.0)))),
                 mode: RigidBody::Static,
                 ..default()
             })
@@ -193,5 +228,5 @@ impl PluginGroup for BenchPlugins {
     }
 }
 
-criterion_group!(benches, stack_sphere_benchmark);
+criterion_group!(benches, stack_benchmark);
 criterion_main!(benches);
