@@ -50,7 +50,7 @@ pub fn setup_camera(mut commands: Commands) {
             transform: Transform::from_xyz(0.0, 2.0, -30.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         })
-        .insert(BvhCamera::new(256, 256))
+        .insert(BvhCamera::new(512, 512))
         // Add our controller
         .insert(CameraController::default())
         .insert(Keep);
@@ -118,7 +118,6 @@ fn toggle_physics(
     input: Res<Input<KeyCode>>,
     state: Res<CurrentState<PhysicsState>>,
 ) {
-
     if input.just_pressed(KeyCode::Space) {
         let target = match state.0 {            
             PhysicsState::Running => PhysicsState::Paused,
@@ -127,7 +126,6 @@ fn toggle_physics(
         commands.insert_resource(NextState(target));
     }
 }
-
 
 fn toggle_physics_debug(
     mut commands: Commands,

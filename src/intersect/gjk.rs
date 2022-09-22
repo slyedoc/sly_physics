@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{colliders::ColliderTrait, math::Mat4Ext, prelude::Collider};
+use crate::{colliders::Collidable, math::Mat4Ext, prelude::Collider};
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 struct Point {
@@ -147,10 +147,10 @@ pub fn gjk_does_intersect(
     )
 }
 
-fn epa_expand<T: ColliderTrait, K: ColliderTrait>(
-    collider_a: &T,
+fn epa_expand(
+    collider_a: &Collider,
     trans_a: &Transform,
-    collider_b: &K,
+    collider_b: &Collider,
     trans_b: &Transform,
     bias: f32,
     simplex_points: &[Point; 4],
@@ -325,7 +325,7 @@ pub fn gjk_closest_points(
     (pt_on_a, pt_on_b)
 }
 
-fn support<T: ColliderTrait, K: ColliderTrait>(
+fn support<T: Collidable, K: Collidable>(
     collider_a: &T,
     trans_a: &Transform,
     collider_b: &K,

@@ -17,7 +17,7 @@ fn main() {
         .add_plugin(PhysicsPlugin)
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
-        .add_plugin(PhysicsBvhCameraPlugin)
+        .add_plugin(DebugBvhCameraPlugin)
         .add_plugin(HelperPlugin)
         .add_startup_system(helper::setup_camera)
         .add_enter_system(AppState::Playing, helper::setup_room)

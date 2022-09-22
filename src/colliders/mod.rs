@@ -7,9 +7,8 @@ pub use r#box::*;
 pub use sphere::*;
 
 use enum_dispatch::*;
-use crate::types::*;
+use crate::{types::*, prelude::Ray};
 use bevy::{prelude::*, reflect::TypeUuid};
-
 
 
 #[derive(Debug, TypeUuid)]
@@ -29,23 +28,26 @@ impl Default for Collider {
 
 
 #[enum_dispatch(Collider)]
-pub trait ColliderTrait {
+pub trait Collidable {
     fn get_center_of_mass(&self) -> Vec3;
     fn get_inertia_tensor(&self) -> Mat3;
     fn get_aabb(&self) -> Aabb;
     fn get_world_aabb(&self,  trans: &Transform, velocity: &Velocity, time: f32) -> Aabb;
     fn get_support(&self, trans: &Transform, dir: Vec3, bias: f32) -> Vec3;
     fn fastest_linear_speed(&self, angular_velocity: Vec3, dir: Vec3) -> f32;
+    
+    /// Note: Ray must already be converted to object space
+    fn intersect(&self, ray: &mut Ray) -> Option<f32>;
 }
 
-
+/// Find the point in the furthest in direction
 // used by cube and convex
 fn find_support_point(verts: &[Vec3], dir: Vec3, pos: Vec3, orient: Quat, bias: f32) -> Vec3 {
-    // find the point in the furthest in direction
+    
     let mut max_pt = (orient * verts[0]) + pos;
     let mut max_dist = dir.dot(max_pt);
-    for &pt in &verts[1..] {
-        let pt = (orient * pt) + pos;
+    for pt in &verts[1..] {
+        let pt = (orient * *pt) + pos;
         let dist = dir.dot(pt);
         if dist > max_dist {
             max_dist = dist;

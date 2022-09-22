@@ -1,136 +1,289 @@
+use std::mem::swap;
+
 use bevy::{
+    math::vec3,
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
 };
 
 use crate::{
-    
+    bvh::{Bin, BvhNode, BvhTri},
+    prelude::Ray,
     types::*,
-    BOUNDS_EPS,
+    BOUNDS_EPS, BVH_BIN_COUNT,
 };
 
-use super::{fastest_linear_speed, find_support_point, ColliderTrait};
+use super::{fastest_linear_speed, find_support_point, Collidable};
 
 #[derive(Debug)]
 pub struct Convex {
     verts: Vec<Vec3>,
-    tris: Vec<TriIndexed>,
+    pub mesh: Mesh,
     bounds: Aabb,
     center_of_mass: Vec3,
     inertia_tensor: Mat3,
+
+    pub nodes: Vec<BvhNode>,
+    pub bvh_tris: Vec<BvhTri>,
+    pub triangle_indexes: Vec<usize>,
 }
 
 impl Convex {
     pub fn new(verts: &[Vec3]) -> Self {
-        let (hull_pts, hull_tris) = build_convex_hull(verts);
-        let bounds = Aabb::from_points(&hull_pts);
-        let centre_of_mass = calculate_center_of_mass(&hull_pts, &hull_tris);
-        let inertia_tensor = calculate_inertia_tensor(&hull_pts, &hull_tris, centre_of_mass);
+        let (hull_points, hull_tris) = build_convex_hull(verts);
+        let bounds = Aabb::from_points(&hull_points);
+        let centre_of_mass = calculate_center_of_mass(&hull_points, &hull_tris);
+        let inertia_tensor = calculate_inertia_tensor(&hull_points, &hull_tris, centre_of_mass);
 
-        Convex {
-            verts: hull_pts,
-            tris: hull_tris,
+        // bvh stuff
+        let mesh = mesh_from_hull_points(&hull_points, &hull_tris);
+        let bvh_tris = parse_bvh_mesh(&mesh);
+
+        let count = bvh_tris.len() as u32;
+
+        // Add root node
+        let mut nodes = Vec::with_capacity(64);
+        nodes.push(BvhNode {
+            left_first: 0,
+            tri_count: count,
+            aabb: Aabb::default(),
+        });
+        // add empty node to offset reset of the vec by 1, so left
+        nodes.push(BvhNode {
+            left_first: 0,
+            tri_count: 0,
+            aabb: Aabb::default(),
+        });
+
+        let triangle_indexes = (0..count as usize).collect::<Vec<_>>();
+
+        let mut convex = Convex {
+            verts: hull_points,
             bounds,
             center_of_mass: centre_of_mass,
             inertia_tensor,
+            mesh,
+            nodes,
+            bvh_tris,
+            triangle_indexes,
+        };
+
+        convex.update_node_bounds(0);
+        convex.subdivide_node(0);
+
+        convex
+    }
+
+    fn update_node_bounds(&mut self, node_idx: usize) {
+        let node = &mut self.nodes[node_idx];
+        node.aabb.mins = Vec3::splat(f32::MAX);
+        node.aabb.maxs = Vec3::splat(-f32::MAX);
+        for i in 0..node.tri_count {
+            let leaf_tri_index = self.triangle_indexes[(node.left_first + i) as usize];
+            let leaf_tri = self.bvh_tris[leaf_tri_index];
+            node.aabb.mins = node.aabb.mins.min(leaf_tri.vertex0);
+            node.aabb.mins = node.aabb.mins.min(leaf_tri.vertex1);
+            node.aabb.mins = node.aabb.mins.min(leaf_tri.vertex2);
+            node.aabb.maxs = node.aabb.maxs.max(leaf_tri.vertex0);
+            node.aabb.maxs = node.aabb.maxs.max(leaf_tri.vertex1);
+            node.aabb.maxs = node.aabb.maxs.max(leaf_tri.vertex2);
         }
+    }
+
+    fn subdivide_node(&mut self, node_idx: usize) {
+        let node = &self.nodes[node_idx];
+
+        // determine split axis using SAH
+        let (axis, split_pos, split_cost) = self.find_best_split_plane(node);
+        let no_split_cost = node.calculate_cost();
+        if split_cost >= no_split_cost {
+            return;
+        }
+
+        // in-place partition
+        let mut i = node.left_first;
+        let mut j = i + node.tri_count - 1;
+        while i <= j {
+            if self.bvh_tris[self.triangle_indexes[i as usize]].centroid[axis] < split_pos {
+                i += 1;
+            } else {
+                self.triangle_indexes.swap(i as usize, j as usize);
+                j -= 1;
+            }
+        }
+
+        // abort split if one of the sides is empty
+        let left_count = i - node.left_first;
+        if left_count == 0 || left_count == node.tri_count {
+            return;
+        }
+
+        // create child nodes
+        self.nodes.push(BvhNode::default());
+        let left_child_idx = self.nodes.len() as u32 - 1;
+        self.nodes.push(BvhNode::default());
+        let right_child_idx = self.nodes.len() as u32 - 1;
+
+        self.nodes[left_child_idx as usize].left_first = self.nodes[node_idx].left_first;
+        self.nodes[left_child_idx as usize].tri_count = left_count;
+        self.nodes[right_child_idx as usize].left_first = i;
+        self.nodes[right_child_idx as usize].tri_count =
+            self.nodes[node_idx].tri_count - left_count;
+
+        self.nodes[node_idx].left_first = left_child_idx;
+        self.nodes[node_idx].tri_count = 0;
+
+        self.update_node_bounds(left_child_idx as usize);
+        self.update_node_bounds(right_child_idx as usize);
+        // recurse
+        self.subdivide_node(left_child_idx as usize);
+        self.subdivide_node(right_child_idx as usize);
+    }
+
+    fn find_best_split_plane(&self, node: &BvhNode) -> (usize, f32, f32) {
+        // determine split axis using SAH
+        let mut best_axis = 0;
+        let mut split_pos = 0.0f32;
+        let mut best_cost = f32::MAX;
+
+        for a in 0..3 {
+            let mut bounds_min = f32::MAX;
+            let mut bounds_max = -f32::MAX;
+            for i in 0..node.tri_count {
+                let triangle =
+                    &self.bvh_tris[self.triangle_indexes[(node.left_first + i) as usize]];
+                bounds_min = bounds_min.min(triangle.centroid[a]);
+                bounds_max = bounds_max.max(triangle.centroid[a]);
+            }
+            if bounds_min == bounds_max {
+                continue;
+            }
+            // populate bins
+            let mut bin = vec![Bin::default(); BVH_BIN_COUNT];
+            let mut scale = BVH_BIN_COUNT as f32 / (bounds_max - bounds_min);
+            for i in 0..node.tri_count {
+                let triangle = &self.bvh_tris[self.triangle_indexes[(node.left_first + i) as usize]];
+                let bin_idx =
+                    (BVH_BIN_COUNT - 1).min(((triangle.centroid[a] - bounds_min) * scale) as usize);
+                bin[bin_idx].tri_count += 1;
+                bin[bin_idx].bounds.grow(triangle.vertex0);
+                bin[bin_idx].bounds.grow(triangle.vertex1);
+                bin[bin_idx].bounds.grow(triangle.vertex2);
+            }
+
+            // gather data for the BINS - 1 planes between the bins
+            let mut left_area = [0.0f32; BVH_BIN_COUNT - 1];
+            let mut right_area = [0.0f32; BVH_BIN_COUNT - 1];
+            let mut left_count = [0u32; BVH_BIN_COUNT - 1];
+            let mut right_count = [0u32; BVH_BIN_COUNT - 1];
+            let mut left_box = Aabb::default();
+            let mut right_box = Aabb::default();
+            let mut left_sum = 0u32;
+            let mut right_sum = 0u32;
+            for i in 0..(BVH_BIN_COUNT - 1) {
+                left_sum += bin[i].tri_count;
+                left_count[i] = left_sum;
+                left_box.grow_aabb(&bin[i].bounds);
+                left_area[i] = left_box.area();
+                right_sum += bin[BVH_BIN_COUNT - 1 - i].tri_count;
+                right_count[BVH_BIN_COUNT - 2 - i] = right_sum;
+                right_box.grow_aabb(&bin[BVH_BIN_COUNT - 1 - i].bounds);
+                right_area[BVH_BIN_COUNT - 2 - i] = right_box.area();
+            }
+
+            // calculate SAH cost for the 7 planes
+            scale = (bounds_max - bounds_min) / BVH_BIN_COUNT as f32;
+            for i in 0..BVH_BIN_COUNT - 1 {
+                let plane_cost =
+                    left_count[i] as f32 * left_area[i] + right_count[i] as f32 * right_area[i];
+                if plane_cost < best_cost {
+                    best_axis = a;
+                    split_pos = bounds_min + scale * (i + 1) as f32;
+                    best_cost = plane_cost;
+                }
+            }
+        }
+        (best_axis, split_pos, best_cost)
     }
 }
 
-// TODO: made this flat normals for the bevy jam
-impl From<&Convex> for Mesh {
-    fn from(collider: &Convex) -> Self {
-        let mut verts: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len() * 3);
-        let mut normals: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len() * 3);
-        let mut indices: Vec<u32> = Vec::with_capacity(collider.tris.len() * 3);
-        
-        for (i, tri) in collider.tris.iter().enumerate() {
-            let a = collider.verts[tri.a as usize];
-            verts.push(a.into());
-            let b = collider.verts[tri.b as usize];
-            verts.push(b.into());
-            let c = collider.verts[tri.c as usize];
-            verts.push(c.into());
+fn mesh_from_hull_points(points: &[Vec3], tri_index: &[TriIndexed]) -> Mesh {
+    let mut verts: Vec<[f32; 3]> = Vec::with_capacity(points.len() * 3);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(points.len() * 3);
+    let mut indices: Vec<u32> = Vec::with_capacity(points.len() * 3);
 
-            let ab = b - a;
-            let ac = c - a;
-            let n = ab.cross(ac).normalize().into();
-            normals.push(n);
-            normals.push(n);
-            normals.push(n);
+    for (i, tri) in tri_index.iter().enumerate() {
+        let a = points[tri.a as usize];
+        verts.push(a.into());
+        let b = points[tri.b as usize];
+        verts.push(b.into());
+        let c = points[tri.c as usize];
+        verts.push(c.into());
 
-            let offset = i as u32 * 3;
-            indices.push(offset);
-            indices.push(offset + 1);
-            indices.push(offset + 2);            
+        let ab = b - a;
+        let ac = c - a;
+        let n = ab.cross(ac).normalize().into();
+        normals.push(n);
+        normals.push(n);
+        normals.push(n);
+
+        let offset = i as u32 * 3;
+        indices.push(offset);
+        indices.push(offset + 1);
+        indices.push(offset + 2);
+    }
+
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verts);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.set_indices(Some(Indices::U32(indices)));
+
+    // fake some UVs for the default shader
+    // let uvs: Vec<[f32; 2]> = std::iter::repeat([0.0; 2])
+    //     .take(collider.verts.len() * 3)
+    //     .collect();
+    // mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh
+}
+
+// TODO: We don't really want to copy the all tris, find better way
+pub fn parse_bvh_mesh(mesh: &Mesh) -> Vec<BvhTri> {
+    match mesh.primitive_topology() {
+        bevy::render::mesh::PrimitiveTopology::TriangleList => {
+            let indexes = match mesh.indices().expect("No Indices") {
+                bevy::render::mesh::Indices::U32(vec) => vec,
+                _ => todo!(),
+            };
+
+            let verts = match mesh
+                .attribute(Mesh::ATTRIBUTE_POSITION)
+                .expect("No Position Attribute")
+            {
+                bevy::render::mesh::VertexAttributeValues::Float32x3(vec) => {
+                    vec.iter().map(|vec| vec3(vec[0], vec[1], vec[2]))
+                }
+                _ => todo!(),
+            }
+            .collect::<Vec<_>>();
+
+            let mut triangles = Vec::with_capacity(indexes.len() / 3);
+            for tri_indexes in indexes.chunks(3) {
+                let v0 = verts[tri_indexes[0] as usize];
+                let v1 = verts[tri_indexes[1] as usize];
+                let v2 = verts[tri_indexes[2] as usize];
+                triangles.push(BvhTri::new(
+                    vec3(v0[0], v0[1], v0[2]),
+                    vec3(v1[0], v1[1], v1[2]),
+                    vec3(v2[0], v2[1], v2[2]),
+                ));
+            }
+            triangles
         }
-
-        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);        
-        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verts);                
-        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);        
-        mesh.set_indices(Some(Indices::U32(indices)));
-
-        // fake some UVs for the default shader
-        // let uvs: Vec<[f32; 2]> = std::iter::repeat([0.0; 2])
-        //     .take(collider.verts.len() * 3)
-        //     .collect();
-        // mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-        mesh
+        _ => todo!(),
     }
 }
 
-// impl From<&ConvexCollider> for Mesh {
-//     fn from(collider: &ConvexCollider) -> Self {
-//         // calculate smoothed normals
-//         // TODO: Could use map?
-//         let mut normals: Vec<[f32; 3]> = Vec::with_capacity(collider.tris.len());
-//         for i in 0..collider.verts.len() as u32 {
-//             // TODO: Could use sum?
-//             let mut n = Vec3::ZERO;
-//             for tri in &collider.tris {
-//                 if i != tri.a && i != tri.b && i != tri.c {
-//                     continue;
-//                 }
-
-//                 let a = collider.verts[tri.a as usize];
-//                 let b = collider.verts[tri.b as usize];
-//                 let c = collider.verts[tri.c as usize];
-
-//                 let ab = b - a;
-//                 let ac = c - a;
-//                 n += ab.cross(ac);
-//             }
-
-//             normals.push(n.normalize().into());
-//         }
-
-//         // TODO: Could add `From<&Vec3>` to help here or `to_array`
-//         let positions: Vec<[f32; 3]> = collider.verts.iter().map(|pt| (*pt).into()).collect();
-
-//         // TODO: Could use flat_map?
-//         let mut indices = Vec::with_capacity(collider.tris.len() * 3);
-//         for tri in &collider.tris {
-//             indices.push(tri.a);
-//             indices.push(tri.b);
-//             indices.push(tri.c);
-//         }
-
-//         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-//         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-
-//         //mesh.set_indices(Some(Indices::U32(indices)));
-
-//         // fake some UVs for the default shader
-//         let uvs: Vec<[f32; 2]> = std::iter::repeat([0.0; 2])
-//             .take(collider.verts.len())
-//             .collect();
-//         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-
-//         mesh
-//     }
-// }
-
-impl ColliderTrait for Convex {
+impl Collidable for Convex {
     fn get_center_of_mass(&self) -> Vec3 {
         self.center_of_mass
     }
@@ -143,12 +296,7 @@ impl ColliderTrait for Convex {
         self.bounds
     }
 
-    fn get_world_aabb(
-        &self,
-        trans: &Transform,
-        velocity: &Velocity,
-        time: f32,
-    ) -> Aabb {
+    fn get_world_aabb(&self, trans: &Transform, velocity: &Velocity, time: f32) -> Aabb {
         let mut aabb = Aabb::default();
         for pt in &self.verts {
             let pt = (trans.rotation * *pt) + trans.translation;
@@ -174,6 +322,49 @@ impl ColliderTrait for Convex {
 
     fn get_support(&self, trans: &Transform, dir: Vec3, bias: f32) -> Vec3 {
         find_support_point(&self.verts, dir, trans.translation, trans.rotation, bias)
+    }
+
+    fn intersect(&self, ray: &mut Ray) -> Option<f32> {
+        //pub fn intersect_collider(&mut self, collider: &Bvh, entity: Entity) {
+        let mut node = &self.nodes[0];
+        let mut stack = Vec::with_capacity(64);
+        let mut distance = None;
+        loop {
+            if node.is_leaf() {
+                for i in 0..node.tri_count {
+                    let tri_index = self.triangle_indexes[(node.left_first + i) as usize];
+                    if let Some(t) = ray.intersect_triangle(&self.bvh_tris[tri_index]) {
+                        if distance.is_none() || t < distance.unwrap() {
+                            distance = Some(t);
+                        }
+                    }                        
+                }
+                if stack.is_empty() {
+                    return distance;
+                }
+                node = stack.pop().unwrap();
+                continue;
+            }
+            let mut child1 = &self.nodes[node.left_first as usize];
+            let mut child2 = &self.nodes[(node.left_first + 1) as usize];
+            let mut dist1 = ray.intersect_aabb(&child1.aabb);
+            let mut dist2 = ray.intersect_aabb(&child2.aabb);
+            if dist1 > dist2 {
+                swap(&mut dist1, &mut dist2);
+                swap(&mut child1, &mut child2);
+            }
+            if dist1 == f32::MAX {
+                if stack.is_empty() {
+                    return distance;
+                }
+                node = stack.pop().unwrap();
+            } else {
+                node = child1;
+                if dist2 != f32::MAX {
+                    stack.push(child2);
+                }
+            }
+        }
     }
 }
 

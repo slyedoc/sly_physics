@@ -1,8 +1,8 @@
 
-use crate::{types::*, BOUNDS_EPS};
+use crate::{types::*, BOUNDS_EPS, prelude::Ray};
 use bevy::{math::vec3, prelude::*};
 
-use super::ColliderTrait;
+use super::Collidable;
 
 #[derive(Debug)]
 pub struct Sphere {
@@ -37,7 +37,7 @@ impl Sphere {
     }
 }
 
-impl ColliderTrait for Sphere {
+impl Collidable for Sphere {
     fn get_center_of_mass(&self) -> Vec3 {
         self.center_of_mass
     }
@@ -83,5 +83,32 @@ impl ColliderTrait for Sphere {
 
     fn fastest_linear_speed(&self, _angular_velocity: Vec3, _dir: Vec3) -> f32 {
         0.0
+    }
+
+    // Returns distance at which ray would hit the sphere, or None if it doesn't hit
+    fn intersect(&self, ray: &mut Ray) -> Option<f32> {
+
+        let sphere_to_ray = ray.origin;
+        let a = ray.direction.dot(ray.direction);
+        let b = 2.0 * ray.direction.dot(ray.origin);
+        let c = sphere_to_ray.dot(sphere_to_ray) - self.radius * self.radius;
+
+        let discriminant = b * b - 4.0 * a * c;
+        if discriminant < 0.0 {
+            return None;
+        } else {
+            let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
+            let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
+
+            if t1 >= 0.0 && t2 >= 0.0 {
+                return Some( t1.min(t2));
+            } else if t1 >= 0.0 {
+                return Some(t1);
+            } else if t2 >= 0.0 {
+                return Some(t2);
+            } else {
+                return None;
+            }
+        }
     }
 }

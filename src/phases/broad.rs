@@ -174,7 +174,7 @@ pub fn broad_phase_bvh(
                     stack.push((node_a.left(), b));
                     
                     //children
-                    stack.push((node_a.left(), node_a.right()));
+                    //stack.push((node_a.left(), node_a.right()));
 
                 } else {
                     stack.push((a, node_b.right()));

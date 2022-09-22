@@ -1,5 +1,5 @@
-use bevy::{prelude::*, pbr::NotShadowCaster};
-use bevy_inspector_egui::{prelude::*, bevy_egui::EguiContext};
+use bevy::{pbr::NotShadowCaster, prelude::*};
+use bevy_inspector_egui::{bevy_egui::EguiContext, prelude::*};
 use sly_physics::prelude::*;
 
 use super::Keep;
@@ -12,8 +12,7 @@ impl Plugin for PickingPlugin {
             .add_startup_system(setup_cursor)
             .add_system_to_stage(
                 PhysicsFixedUpdate,
-                cursor_system
-                    .after(PhysicsSystems::Resolve),
+                cursor_system.after(PhysicsSystems::Resolve),
             );
     }
 }
@@ -59,6 +58,7 @@ fn cursor_system(
     camera_query: Query<(&Camera, &Transform), Without<Cursor>>,
     mut cusror_query: Query<(&mut Transform, &mut Visibility), With<Cursor>>,
     tlas: Res<Tlas>,
+    colliders: Res<Assets<Collider>>,
     mouse_input: Res<Input<MouseButton>>,
     mut egui_context: ResMut<EguiContext>,
     mut inspector: ResMut<Inspector>,
@@ -72,10 +72,10 @@ fn cursor_system(
         let (mut cursor_trans, mut cursor_vis) = cusror_query.single_mut();
         // create a ray
         let mut ray = Ray::from_camera(camera, camera_transform, mouse_pos);
-        
+
         // test ray agaist tlas and see if we hit
-        let hit_maybe = ray.intersect_tlas(&tlas);
-        
+        let hit_maybe = ray.intersect_tlas(&tlas, &colliders);
+
         if let Some(hit) = hit_maybe {
             // we could do something with the entity here
             cursor_trans.translation = ray.origin + ray.direction * hit.distance;

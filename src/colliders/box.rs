@@ -1,12 +1,11 @@
 use bevy::{math::vec3, prelude::*};
 
 use crate::{
-    
     types::*,
-    BOUNDS_EPS,
+    BOUNDS_EPS, prelude::Ray,
 };
 
-use super::{fastest_linear_speed, find_support_point, ColliderTrait};
+use super::{fastest_linear_speed, find_support_point, Collidable};
 
 #[derive(Debug)]
 pub struct Box {
@@ -69,7 +68,7 @@ impl Box {
     }
 }
 
-impl ColliderTrait for Box {
+impl Collidable for Box {
     fn get_center_of_mass(&self) -> Vec3 {
         self.center_of_mass
     }
@@ -115,5 +114,63 @@ impl ColliderTrait for Box {
 
     fn fastest_linear_speed(&self, angular_velocity: Vec3, dir: Vec3) -> f32 {
         fastest_linear_speed(&self.verts, angular_velocity, self.center_of_mass, dir)
+    }
+    // Returns distance at which ray would hit the sphere, or None if it doesn't hit
+    fn intersect(&self, ray: &mut Ray) -> Option<f32> {
+        
+        let mut tmin = (self.aabb.mins.x - ray.origin.x) / ray.direction.x;
+        let mut tmax = (self.aabb.maxs.x - ray.origin.x) / ray.direction.x;
+
+        if tmin > tmax {
+            std::mem::swap(&mut tmin, &mut tmax);
+        }
+
+        let mut tymin = (self.aabb.mins.y - ray.origin.y) / ray.direction.y;
+        let mut tymax = (self.aabb.maxs.y - ray.origin.y) / ray.direction.y;
+
+        if tymin > tymax {
+            std::mem::swap(&mut tymin, &mut tymax);
+        }
+
+        if (tmin > tymax) || (tymin > tmax) {
+            return None;
+        }
+
+        if tymin > tmin {
+            tmin = tymin;
+        }
+
+        if tymax < tmax {
+            tmax = tymax;
+        }
+
+        let mut tzmin = (self.aabb.mins.z - ray.origin.z) / ray.direction.z;
+        let mut tzmax = (self.aabb.maxs.z - ray.origin.z) / ray.direction.z;
+
+        if tzmin > tzmax {
+            std::mem::swap(&mut tzmin, &mut tzmax);
+        }
+
+        if (tmin > tzmax) || (tzmin > tmax) {
+            return None;
+        }
+
+        if tzmin > tmin {
+            tmin = tzmin;
+        }
+
+        if tzmax < tmax {
+            tmax = tzmax;
+        }
+
+        if tmax < 0.0 {
+            return None;
+        }
+
+        if tmin < 0.0 {
+            return Some(tmax);
+        }
+
+        Some(tmin)
     }
 }

@@ -1,20 +1,30 @@
-use crate::{utils::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystems, Ray, Tlas};
+use crate::{
+    prelude::Collider, utils::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystems, Ray,
+    Tlas,
+};
 use bevy::{
     math::vec3,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
     tasks::*,
+    utils::HashMap,
 };
 use iyes_loopless::prelude::*;
 
 use super::PhysicsDebugState;
 
-pub struct PhysicsBvhCameraPlugin;
+pub struct DebugBvhCameraPlugin;
 
 // Really should only be used to debug and profile bvh
-impl Plugin for PhysicsBvhCameraPlugin {
+impl Plugin for DebugBvhCameraPlugin {
     fn build(&self, app: &mut App) {
-        app
+        app.init_resource::<CameraDebugColors>()
+            .add_system_to_stage(
+                PhysicsFixedUpdate,
+                update_camera_debug_colors
+                    .run_in_state(PhysicsDebugState::Running)
+                    .before(PhysicsSystems::Resolve),
+            )
             .add_system_to_stage(
                 PhysicsFixedUpdate,
                 render_image
@@ -23,6 +33,29 @@ impl Plugin for PhysicsBvhCameraPlugin {
                     .after(PhysicsSystems::Resolve),
             )
             .add_exit_system(PhysicsDebugState::Running, remove_ui);
+    }
+}
+
+const COLORS: [Color; 5] = [
+    Color::rgb(0.0, 0.0, 0.0),
+    Color::rgb(1.0, 0.0, 0.0),
+    Color::rgb(0.0, 1.0, 0.0),
+    Color::rgb(0.0, 0.0, 1.0),
+    Color::rgb(1.0, 1.0, 1.0),
+];
+
+#[derive(Default, Deref, DerefMut)]
+pub struct CameraDebugColors(pub HashMap<Entity, Color>);
+
+fn update_camera_debug_colors(
+    mut entity_colors: ResMut<CameraDebugColors>,
+    collider_query: Query<Entity, With<Handle<Collider>>>,
+) {
+    for entity in collider_query.iter() {
+        if !entity_colors.contains_key(&entity) {
+            let color = COLORS[entity_colors.len() % COLORS.len()];
+            entity_colors.insert(entity, color);
+        }
     }
 }
 
@@ -107,14 +140,18 @@ impl BvhCamera {
     }
 }
 
+
+
 pub fn render_image(
     mut commands: Commands,
     mut camera_query: Query<(&mut BvhCamera, &Transform)>,
     node_query: Query<&Node>,
     mut images: ResMut<Assets<Image>>,
     tlas: Res<Tlas>,
+    colliders: Res<Assets<Collider>>,
+    entity_colors: Res<CameraDebugColors>,
 ) {
-    // you really only want one bvh camera, 
+    // you really only want one bvh camera,
     let (mut camera, trans) = camera_query.single_mut();
 
     // setup image if needed
@@ -132,7 +169,7 @@ pub fn render_image(
 
         camera.image = Some(image);
     }
-    
+
     // check that the node still exists
     if let Some(id) = camera.ui_id {
         if node_query.get(id).is_err() {
@@ -171,8 +208,8 @@ pub fn render_image(
 
         // TODO: after 0.8 ComputeTaskPool::get() fails, using this for now
         let pool = TaskPoolBuilder::new()
-        .thread_name("Bvh Camera ThreadPool".to_string())
-        .build();
+            .thread_name("Bvh Camera ThreadPool".to_string())
+            .build();
 
         // TODO: Make this acutally tilings, currenty this just takes a slice of pixels in a row
         const PIXEL_TILE_COUNT: usize = 64;
@@ -190,11 +227,13 @@ pub fn render_image(
                     let u = x as f32 / camera.width as f32;
                     let v = y as f32 / camera.height as f32;
                     let mut ray = camera.get_ray(u, 1.0 - v);
-                    let color = if let Some(hit) = ray.intersect_tlas(&tlas) {
-                        vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0
-                    } else {
-                        Vec3::ZERO
-                    };
+                    let mut hit_color = Color::BLACK;
+                    if let Some(hit) = ray.intersect_tlas(&tlas, &colliders) {
+                        if let Some(color) = entity_colors.get(&hit.entity) {
+                            hit_color = *color;
+                        }
+                    }
+                    let color = vec3(hit_color.r(), hit_color.g(), hit_color.b()) * 255.0;
                     pixels[offset] = color.x as u8;
                     pixels[offset + 1] = color.y as u8;
                     pixels[offset + 2] = color.z as u8;

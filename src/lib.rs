@@ -43,7 +43,7 @@ const BOUNDS_EPS: f32 = 0.01;
 pub mod prelude {
     pub use crate::{
         bvh::Ray, bvh::Tlas, colliders::*, constraints::PenetrationArena, debug::BvhCamera,
-        debug::PhysicsBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState, debug::DebugEntityAabbPlugin,
+        debug::DebugBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState, debug::DebugEntityAabbPlugin,
         dynamics::*, types::Aabb, types::RBHelper, types::CenterOfMass, types::Elasticity,
         types::Friction, types::InertiaTensor, types::Velocity, types::Mass, types::InverseMass, types::InverseInertiaTensor,
         types::RigidBody, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState,
@@ -94,7 +94,7 @@ pub enum PhysicsSystems {
     Setup,
     SetupConvex,
     Update,
-    UpdateBvh,
+    UpdateTlas,
     Dynamics,
     Broad,
     Narrow,
@@ -151,9 +151,9 @@ impl Plugin for PhysicsPlugin {
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::UpdateBvh)
+                    .label(PhysicsSystems::UpdateTlas)
                     .after(PhysicsSystems::Update)
-                    .with_system(update_bvh)
+                    .with_system(update_tlas)
                     .into(),
             )
             // phases
@@ -162,7 +162,7 @@ impl Plugin for PhysicsPlugin {
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
                     .label(PhysicsSystems::Broad)
-                    .after(PhysicsSystems::UpdateBvh)
+                    .after(PhysicsSystems::UpdateTlas)
                     .with_system(broad_phase)
                     //.with_system(broad_phase_bvh)
                     .into(),
@@ -305,7 +305,6 @@ pub fn spawn(
         ),
         Added<Handle<Collider>>,
     >,
-    mut tlas: ResMut<Tlas>,
     colliders: Res<Assets<Collider>>,
 ) {
     for (
@@ -340,13 +339,9 @@ pub fn spawn(
 
         commands.entity(e).insert(InverseMass(inv_mass));
 
-
         center_of_mass.0 = collider.get_center_of_mass();
         inertia_tensor.0 = collider.get_inertia_tensor();
         inverse_inertia_tensor.0 = inertia_tensor.0.inverse() * inv_mass;
-        tlas.add(collider_handle.id, collider, e);
-        
-
     }
 }
 
@@ -360,7 +355,6 @@ pub fn update_aabb(
     config: Res<PhysicsConfig>,
     colliders: Res<Assets<Collider>>,
 ) {
-
     for (trans, mut aabb, col, lin_vel) in query.iter_mut() {
         let collider = colliders.get(col).unwrap();
         *aabb = collider.get_world_aabb(trans, lin_vel, config.time);         
@@ -368,56 +362,68 @@ pub fn update_aabb(
 }
 
 // TODO: both of these update system are incomplete, for now we are rebuilding every frame
-fn update_bvh(query: Query<(&Transform, &Aabb)>, mut tlas: ResMut<Tlas>) {
-    tlas.update_bvh_instances(&query);
-    tlas.build();
-
-
-}
-
-// TODO: We don't really want to copy the all tris twice, find better way
-pub fn parse_mesh(mesh: &Mesh) -> (Vec<Vec3>, Vec<TriIndexed>, Vec<BvhTri>) {
-    match mesh.primitive_topology() {
-        bevy::render::mesh::PrimitiveTopology::TriangleList => {
-            let indexes = match mesh.indices().expect("No Indices") {
-                bevy::render::mesh::Indices::U32(vec) => vec,
-                _ => todo!(),
-            };
-
-            let verts = match mesh
-                .attribute(Mesh::ATTRIBUTE_POSITION)
-                .expect("No Position Attribute")
-            {
-                bevy::render::mesh::VertexAttributeValues::Float32x3(vec) => {
-                    vec.iter().map(|vec| vec3(vec[0], vec[1], vec[2]))
-                }
-                _ => todo!(),
-            }
-            .collect::<Vec<_>>();
-
-            let mut tri_indexed = Vec::with_capacity(indexes.len() / 3);
-            let mut tri_bvh = Vec::with_capacity(indexes.len() / 3);
-            for tri_indexes in indexes.chunks(3) {
-                let v0 = verts[tri_indexes[0] as usize];
-                let v1 = verts[tri_indexes[1] as usize];
-                let v2 = verts[tri_indexes[2] as usize];
-                tri_bvh.push(BvhTri::new(
-                    vec3(v0[0], v0[1], v0[2]),
-                    vec3(v1[0], v1[1], v1[2]),
-                    vec3(v2[0], v2[1], v2[2]),
-                ));
-                tri_indexed.push(TriIndexed {
-                    a: tri_indexes[0],
-                    b: tri_indexes[1],
-                    c: tri_indexes[2],
-                });
-            }
-
-            (verts, tri_indexed, tri_bvh)
-        }
-        _ => todo!(),
+fn update_tlas(query: Query<(Entity, &Handle<Collider>, &Transform, &Aabb)>, mut tlas: ResMut<Tlas>) {
+    // update_bvh_instances;
+    tlas.blas.clear();
+    for (entity, col,  trans, aabb) in query.iter() {
+        tlas.blas.push( BvhInstance { 
+            entity,
+            collider: col.clone(),
+            inv_trans: trans.compute_matrix().inverse(),
+            bounds: *aabb 
+        });
     }
+
+    // Build Tlas
+    tlas.nodes.clear();
+
+    // reserve root node
+    tlas.nodes.push(TlasNode::default());
+
+    let mut node_index = vec![0u32; tlas.blas.len() + 1];
+    let mut node_indices = tlas.blas.len() as i32;
+
+    // assign a TLASleaf node for each BLAS and build node indexs
+    for (i, (_entity, _col, _trans, aabb)) in query.iter().enumerate() {
+        node_index[i] = i as u32 + 1;
+        tlas.nodes.push(TlasNode {
+            aabb: *aabb,
+            left_right: 0, // is leaf
+            blas: i as u32,
+        });
+    }
+
+    // use agglomerative clustering to build the TLAS
+    let mut a = 0i32;
+    let mut b = tlas.find_best_match(&node_index, node_indices, a);
+    while node_indices > 1 {
+        let c = tlas.find_best_match(&node_index, node_indices, b);
+        if a == c {
+            let node_index_a = node_index[a as usize];
+            let node_index_b = node_index[b as usize];
+            let node_a = &tlas.nodes[node_index_a as usize];
+            let node_b = &tlas.nodes[node_index_b as usize];
+            let aabb = Aabb {
+                mins: node_a.aabb.mins.min(node_b.aabb.mins),
+                maxs: node_a.aabb.maxs.max(node_b.aabb.maxs),
+            }; 
+            tlas.nodes.push(TlasNode {
+                aabb,
+                left_right: node_index_a + (node_index_b << 16),
+                blas: 0,
+            });
+            node_index[a as usize] = tlas.nodes.len() as u32 - 1;
+            node_index[b as usize] = node_index[node_indices as usize - 1];
+            node_indices -= 1;
+            b = tlas.find_best_match(&node_index, node_indices, a);
+        } else {
+            a = b;
+            b = c;
+        }
+    }
+    tlas.nodes[0] = tlas.nodes[node_index[a as usize] as usize];
 }
+
 
 
 // TODO: We don't really want to copy the all tris, find better way

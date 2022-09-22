@@ -1,8 +1,8 @@
 use std::mem::swap;
 
 use crate::{    
-    bvh::{Bvh, BvhInstance, BvhTri, Tlas, TlasNode},
-    types::Aabb, 
+    bvh::{BvhInstance, BvhTri, Tlas, TlasNode},
+    types::Aabb, prelude::{Collider, Collidable}, 
 };
 use bevy::prelude::*;
 
@@ -96,7 +96,7 @@ impl Ray {
     // Moller Trumbore
     // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     #[inline(always)]
-    pub fn intersect_triangle(&mut self, tri: &BvhTri, tri_index: usize, entity: Entity) {
+    pub fn intersect_triangle(&mut self, tri: &BvhTri) -> Option<f32> {
         #[cfg(feature = "trace")]
         let _span = info_span!("intersect_triangle").entered();
         let edge1 = tri.vertex1 - tri.vertex0;
@@ -104,7 +104,7 @@ impl Ray {
         let h = self.direction.cross(edge2);
         let a = edge1.dot(h);  
         if a.abs() < 0.00001 { 
-            return;
+            return None;
         }
 
         // ray parallel to triangle
@@ -112,36 +112,19 @@ impl Ray {
         let s = self.origin - tri.vertex0;
         let u = f * s.dot(h);
         if !(0.0..=1.0).contains(&u) {
-            return;
+            return None;
         }
         let q = s.cross(edge1);
         let v = f * self.direction.dot(q);
         if v < 0.0 || u + v > 1.0 {
-            return;
+            return None;
         }
         let t = f * edge2.dot(q);
-        // TODO: The option part here feels sloppy
-        if t > 0.0001 {
-            if let Some(hit) = self.hit {
-                if t < hit.distance {
-                    self.hit = Some(Hit {
-                        distance: t,
-                        u,
-                        v,
-                        tri_index,
-                        entity,
-                    });
-                }
-            } else {
-                self.hit = Some(Hit {
-                    distance: t,
-                    u,
-                    v,
-                    tri_index,
-                    entity,
-                });
-            }
+
+        if t < 0.0001 {
+            return None;
         }
+        Some(t)
     }
 
     #[inline(always)]
@@ -175,64 +158,46 @@ impl Ray {
             f32::MAX
         }
     }
-    
-    pub fn intersect_bvh(&mut self, bvh: &Bvh, entity: Entity) {
-        #[cfg(feature = "trace")]
-        let _span = info_span!("intersect_bvh").entered();
-        let mut node = &bvh.nodes[0];
-        let mut stack = Vec::with_capacity(64);
-        loop {
-            if node.is_leaf() {
-                for i in 0..node.tri_count {
-                    let tri_index = bvh.triangle_indexes[(node.left_first + i) as usize];
-                    self.intersect_triangle(&bvh.tris[tri_index], tri_index, entity);
-                }
-                if stack.is_empty() {
-                    break;
-                }
-                node = stack.pop().unwrap();
-                continue;
-            }
-            let mut child1 = &bvh.nodes[node.left_first as usize];
-            let mut child2 = &bvh.nodes[(node.left_first + 1) as usize];
-            let mut dist1 = self.intersect_aabb(&child1.aabb);
-            let mut dist2 = self.intersect_aabb(&child2.aabb);
-            if dist1 > dist2 {
-                swap(&mut dist1, &mut dist2);
-                swap(&mut child1, &mut child2);
-            }
-            if dist1 == f32::MAX {
-                if stack.is_empty() {
-                    break;
-                }
-                node = stack.pop().unwrap();
-            } else {
-                node = child1;
-                if dist2 != f32::MAX {
-                    stack.push(child2);
-                }
-            }
-        }
-    }
+   
 
-    pub fn intersect_bvh_instance(&mut self, bvh_instance: &BvhInstance, bounding_volumes_hierarchies: &[Bvh]) {
+    pub fn intersect_collider_instance(&mut self, colliders: &Assets<Collider>, bvh_instance: &BvhInstance) {
         #[cfg(feature = "trace")]
         let _span = info_span!("intersect_bvh_instance").entered();
-        let bvh = &bounding_volumes_hierarchies[bvh_instance.bvh_index];
+        let collider = colliders.get(&bvh_instance.collider).unwrap();
         // backup ray and transform original
         let mut backup_ray = *self;
 
         self.origin = bvh_instance.inv_trans.transform_point3(self.origin);
         self.direction = bvh_instance.inv_trans.transform_vector3(self.direction);
         self.direction_inv = self.direction.recip();
-        self.intersect_bvh(bvh, bvh_instance.entity);
+        if let Some(t) = collider.intersect(self) {
+            if let Some(hit) = self.hit {
+                if t < hit.distance {
+                    self.hit = Some(Hit {
+                        distance: t,
+                        u: 0.5,
+                        v: 0.5,
+                        tri_index: 0,
+                        entity: bvh_instance.entity,
+                    });
+                }
+            } else {
+                self.hit = Some(Hit {
+                    distance: t,
+                    u: 0.5,
+                    v: 0.5,
+                    tri_index: 0,
+                    entity: bvh_instance.entity,
+                });
+            }
+        };
 
         // restore ray origin and direction
         backup_ray.hit = self.hit;
         *self = backup_ray;
     }
 
-    pub fn intersect_tlas(&mut self, tlas: &Tlas) -> Option<Hit> {        
+    pub fn intersect_tlas(&mut self, tlas: &Tlas, colliders: &Assets<Collider>) -> Option<Hit> {        
         if tlas.nodes.is_empty() || tlas.blas.is_empty() {
             return None;
         }
@@ -240,7 +205,7 @@ impl Ray {
         let mut node = &tlas.nodes[0];
         loop {
             if node.is_leaf() {
-                self.intersect_bvh_instance(&tlas.blas[node.blas as usize], &tlas.colliders);
+                self.intersect_collider_instance(colliders, &tlas.blas[node.blas as usize] );
                 if stack.is_empty() {
                     break;
                 } else {

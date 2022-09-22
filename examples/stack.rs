@@ -17,7 +17,7 @@ fn main() {
         .add_plugin(PhysicsPlugin)
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
-        //.add_plugin(PhysicsBvhCameraPlugin)
+        .add_plugin(DebugBvhCameraPlugin)
         // local setup stuff
         .add_plugin(HelperPlugin)
 
@@ -150,7 +150,7 @@ pub fn setup(
 
     let diamond = make_diamond_convex_shape();
     let diamond_convex_collider = Convex::new(&diamond);
-    let diamond_mesh = Mesh::from(&diamond_convex_collider);
+    let diamond_mesh = diamond_convex_collider.mesh.clone();
 
 
     commands

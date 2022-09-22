@@ -18,8 +18,8 @@ pub fn narrow_phase(
     colliders: Res<Assets<Collider>>,
 ) {
 
-    let count = broad_contacts.iter().len();
-    info!("Narrow Phase: {} contacts", count);
+    // let count = broad_contacts.iter().len();
+    // info!("Narrow Phase: {} contacts", count);
     for pair in broad_contacts.iter() {
         let bodies = query.get_many_mut([pair.a, pair.b]);
         let [(mut trans_a, col_a, mut vel_a, com_a, i_tensor_a), (mut trans_b, col_b, mut vel_b, com_b, i_tensor_b)] =
