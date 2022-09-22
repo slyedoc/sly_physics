@@ -7,8 +7,6 @@ fn main() {
         stacks: 5,
     });
     //let attr = mesh.attributes();
-    let verts = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
-    let indices = mesh.indices().unwrap();
     
     for a in mesh.attributes() {
         println!("{:?}", a);

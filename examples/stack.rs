@@ -8,18 +8,16 @@ mod helper;
 fn main() {
     App::new()
         .insert_resource(WindowDescriptor {
-            present_mode: PresentMode::AutoNoVsync,
+            present_mode: PresentMode::AutoVsync,
             ..default()
         })
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::default())
-        // our phsycis plugin
+        // our physics plugin
         .add_plugin(PhysicsPlugin)
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
         //.add_plugin(PhysicsBvhCameraPlugin)
-        // testing aabb debug plugin
-        //.add_plugin(DebugAabbPlugin)
         // local setup stuff
         .add_plugin(HelperPlugin)
 
@@ -32,7 +30,7 @@ fn main() {
 }
 
 fn apply_scale(mut config: ResMut<PhysicsConfig>, stack: Res<Stack>) {
-    config.time = stack.time_scale * PHYSISCS_TIMESTEP as f32;
+    config.time = stack.time_scale * PHYSICS_TIMESTEP as f32;
 }
 
 #[derive(Inspectable)]
@@ -53,12 +51,13 @@ pub enum StackMode {
 
 impl Default for Stack {
     fn default() -> Self {
+        let size = 8;
         Self {
-            count: (10, 10, 10),
+            count: (size, size, size),
             spacing: 1.1,
             time_scale: 1.0,
             mode: StackMode::Cube,
-            ball_velocity: 60.0,
+            ball_velocity: 0.0,
         }
     }
 }

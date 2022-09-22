@@ -13,11 +13,13 @@ pub fn narrow_phase(
     )>,
     mut broad_contacts: EventReader<BroadContact>,
     mut contacts: EventWriter<Contact>,
-    mut manifold_arean: ResMut<PenetrationArena>,
+    mut manifold_arena: ResMut<PenetrationArena>,
     config: Res<PhysicsConfig>,
     colliders: Res<Assets<Collider>>,
 ) {
 
+    let count = broad_contacts.iter().len();
+    info!("Narrow Phase: {} contacts", count);
     for pair in broad_contacts.iter() {
         let bodies = query.get_many_mut([pair.a, pair.b]);
         let [(mut trans_a, col_a, mut vel_a, com_a, i_tensor_a), (mut trans_b, col_b, mut vel_b, com_b, i_tensor_b)] =
@@ -25,7 +27,7 @@ pub fn narrow_phase(
 
         // TODO: ideally we can use different collision test between different shapes, for now really only sphere sphere has its own
         // and due to avoiding dynamic dispatching we have split everything out, in hind sight we really should have just started with dynamic dispatching
-        // and removed it later if testing show it was faster, at this point I may not be and it does create alot of boiler plate and code dupilication
+        // and removed it later if testing show it was faster, at this point I may not be and it does create a lot of boiler plate and code duplication
         let collider_a = colliders.get(col_a).unwrap();
         let collider_b = colliders.get(col_b).unwrap();
 
@@ -118,7 +120,7 @@ pub fn narrow_phase(
 
         } {
             if contact.time_of_impact == 0.0 {
-                manifold_arean.add_contact(contact, &trans_a, com_a, &trans_b, com_b);
+                manifold_arena.add_contact(contact, &trans_a, com_a, &trans_b, com_b);
             } else { 
                 // ballistic contact
                 contacts.send(contact);
@@ -211,7 +213,7 @@ fn conservative_advancement(
         dt -= time_to_go;
         toi += time_to_go;
 
-        // advanceme
+        // advance
         RBHelper::update(trans_a, vel_a, com_a, i_tensor_a, time_to_go);
         RBHelper::update(trans_b, vel_b, com_b, i_tensor_b, time_to_go);
     }

@@ -10,14 +10,16 @@ pub struct TlasNode {
 }
 
 impl TlasNode {
+    #[inline]
     pub fn left(&self) -> usize {
         (self.left_right & 0xffff) as usize
     }
 
+    #[inline]
     pub fn right(&self) -> usize {
         (self.left_right >> 16) as usize
     }
-
+    #[inline]
     pub fn is_leaf(&self) -> bool {
         self.left_right == 0
     }
@@ -25,36 +27,36 @@ impl TlasNode {
 
 #[derive(Debug)]
 pub struct Tlas {
-    pub tlas_nodes: Vec<TlasNode>,
+    pub nodes: Vec<TlasNode>,
     pub blas: Vec<BvhInstance>,
-    pub bvhs: Vec<Bvh>,
+    pub bounding_volumes: Vec<Bvh>,
 }
 
 impl Default for Tlas {
     fn default() -> Self {
         Tlas {
-            tlas_nodes: Vec::with_capacity(0),
+            nodes: Vec::with_capacity(0),
             blas: Default::default(),
-            bvhs: Default::default(),
+            bounding_volumes: Default::default(),
         }
     }
 }
 
 impl Tlas {
     pub fn add_bvh(&mut self, bvh: Bvh) -> usize {
-        self.bvhs.push(bvh);
-        self.bvhs.len() - 1
+        self.bounding_volumes.push(bvh);
+        self.bounding_volumes.len() - 1
     }
 
-    pub fn add_instance(&mut self, instnace: BvhInstance) {
-        self.blas.push(instnace);
+    pub fn add_instance(&mut self, instance: BvhInstance) {
+        self.blas.push(instance);
     }
 
     pub fn build(&mut self) {
-        self.tlas_nodes.clear();
-        self.tlas_nodes.reserve(self.blas.len() + 1);
+        self.nodes.clear();
+        self.nodes.reserve(self.blas.len() + 1);
         // reserve root node
-        self.tlas_nodes.push(TlasNode::default());
+        self.nodes.push(TlasNode::default());
 
         let mut node_index = vec![0u32; self.blas.len() + 1];
         let mut node_indices = self.blas.len() as i32;
@@ -63,7 +65,7 @@ impl Tlas {
         // and index
         for (i, b) in self.blas.iter().enumerate() {
             node_index[i] = i as u32 + 1;
-            self.tlas_nodes.push(TlasNode {
+            self.nodes.push(TlasNode {
                 aabb: b.bounds,
                 left_right: 0, // is leaf
                 blas: i as u32,
@@ -78,9 +80,9 @@ impl Tlas {
             if a == c {
                 let node_index_a = node_index[a as usize];
                 let node_index_b = node_index[b as usize];
-                let node_a = &self.tlas_nodes[node_index_a as usize];
-                let node_b = &self.tlas_nodes[node_index_b as usize];
-                self.tlas_nodes.push(TlasNode {
+                let node_a = &self.nodes[node_index_a as usize];
+                let node_b = &self.nodes[node_index_b as usize];
+                self.nodes.push(TlasNode {
                     aabb: Aabb {
                         mins: node_a.aabb.mins.min(node_b.aabb.mins),
                         maxs: node_a.aabb.maxs.max(node_b.aabb.maxs),
@@ -88,7 +90,7 @@ impl Tlas {
                     left_right: node_index_a + (node_index_b << 16),
                     blas: 0,
                 });
-                node_index[a as usize] = self.tlas_nodes.len() as u32 - 1;
+                node_index[a as usize] = self.nodes.len() as u32 - 1;
                 node_index[b as usize] = node_index[node_indices as usize - 1];
                 node_indices -= 1;
                 b = self.find_best_match(&node_index, node_indices, a);
@@ -97,7 +99,7 @@ impl Tlas {
                 b = c;
             }
         }
-        self.tlas_nodes[0] = self.tlas_nodes[node_index[a as usize] as usize];
+        self.nodes[0] = self.nodes[node_index[a as usize] as usize];
     }
 
     pub fn find_best_match(&self, list: &[u32], n: i32, a: i32) -> i32 {
@@ -105,15 +107,15 @@ impl Tlas {
         let mut best_b = -1i32;
         for b in 0..n {
             if b != a {
-                let bmax = self.tlas_nodes[list[a as usize] as usize]
+                let best_max = self.nodes[list[a as usize] as usize]
                     .aabb
                     .maxs
-                    .max(self.tlas_nodes[list[b as usize] as usize].aabb.maxs);
-                let bmin = self.tlas_nodes[list[a as usize] as usize]
+                    .max(self.nodes[list[b as usize] as usize].aabb.maxs);
+                let best_min = self.nodes[list[a as usize] as usize]
                     .aabb
                     .mins
-                    .min(self.tlas_nodes[list[b as usize] as usize].aabb.mins);
-                let e = bmax - bmin;
+                    .min(self.nodes[list[b as usize] as usize].aabb.mins);
+                let e = best_max - best_min;
                 let surface_area = e.x * e.y + e.y * e.z + e.z * e.x;
                 if surface_area < smallest {
                     smallest = surface_area;

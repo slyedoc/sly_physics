@@ -9,7 +9,6 @@ pub use ray::*;
 use crate::{types::Aabb, BVH_BIN_COUNT};
 use bevy::{ prelude::*, reflect::TypeUuid};
 
-
 #[derive(Default, Debug)]
 pub struct BvhNode {
     pub aabb: Aabb,
@@ -48,19 +47,20 @@ impl BvhInstance {
     }
 }
 
+// TODO: Set this up like I did colliders
 #[derive(Default, Component, Debug, TypeUuid)]
 #[uuid = "81299f9d-41e0-4ff0-86b7-6bef6c3f67c1"]
 pub struct Bvh {
     pub nodes: Vec<BvhNode>,
     pub tris: Vec<BvhTri>,
-    pub triangle_indexs: Vec<usize>,
+    pub triangle_indexes: Vec<usize>,
 }
 
 impl Bvh {
     // TODO: for now bvh get a copy of there down tris, this allows tlas to self contained
     // allowing for tlas intersection to used with any other resources, and no need for events
     // This last part is the largest reason for keeping it like this, not needing to wait on a
-    // raycast event makes using it alot more friendly
+    // raycast event makes using it more friendly
     pub fn new(triangles: Vec<BvhTri>) -> Bvh {
         assert!(!triangles.is_empty());
         let count = triangles.len() as u32;
@@ -82,7 +82,7 @@ impl Bvh {
                 });
                 nodes
             },
-            triangle_indexs: (0..count as usize).collect::<Vec<_>>(),
+            triangle_indexes: (0..count as usize).collect::<Vec<_>>(),
         };
 
         bvh.update_node_bounds(0);
@@ -115,7 +115,7 @@ impl Bvh {
         node.aabb.mins = Vec3::splat(f32::MAX);
         node.aabb.maxs = Vec3::splat(-f32::MAX);
         for i in 0..node.tri_count {
-            let leaf_tri_index = self.triangle_indexs[(node.left_first + i) as usize];
+            let leaf_tri_index = self.triangle_indexes[(node.left_first + i) as usize];
             let leaf_tri = self.tris[leaf_tri_index];
             node.aabb.mins = node.aabb.mins.min(leaf_tri.vertex0);
             node.aabb.mins = node.aabb.mins.min(leaf_tri.vertex1);
@@ -131,8 +131,8 @@ impl Bvh {
 
         // determine split axis using SAH
         let (axis, split_pos, split_cost) = self.find_best_split_plane(node);
-        let nosplit_cost = node.calculate_cost();
-        if split_cost >= nosplit_cost {
+        let no_split_cost = node.calculate_cost();
+        if split_cost >= no_split_cost {
             return;
         }
 
@@ -140,10 +140,10 @@ impl Bvh {
         let mut i = node.left_first;
         let mut j = i + node.tri_count - 1;
         while i <= j {
-            if self.tris[self.triangle_indexs[i as usize]].centroid[axis] < split_pos {
+            if self.tris[self.triangle_indexes[i as usize]].centroid[axis] < split_pos {
                 i += 1;
             } else {
-                self.triangle_indexs.swap(i as usize, j as usize);
+                self.triangle_indexes.swap(i as usize, j as usize);
                 j -= 1;
             }
         }
@@ -186,7 +186,7 @@ impl Bvh {
             let mut bounds_min = f32::MAX;
             let mut bounds_max = -f32::MAX;
             for i in 0..node.tri_count {
-                let triangle = &self.tris[self.triangle_indexs[(node.left_first + i) as usize]];
+                let triangle = &self.tris[self.triangle_indexes[(node.left_first + i) as usize]];
                 bounds_min = bounds_min.min(triangle.centroid[a]);
                 bounds_max = bounds_max.max(triangle.centroid[a]);
             }
@@ -197,7 +197,7 @@ impl Bvh {
             let mut bin = vec![Bin::default(); BVH_BIN_COUNT];
             let mut scale = BVH_BIN_COUNT as f32 / (bounds_max - bounds_min);
             for i in 0..node.tri_count {
-                let triangle = &self.tris[self.triangle_indexs[(node.left_first + i) as usize]];
+                let triangle = &self.tris[self.triangle_indexes[(node.left_first + i) as usize]];
                 let bin_idx =
                     (BVH_BIN_COUNT - 1).min(((triangle.centroid[a] - bounds_min) * scale) as usize);
                 bin[bin_idx].tri_count += 1;

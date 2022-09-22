@@ -2,11 +2,6 @@ use bevy::prelude::*;
 
 use crate::{colliders::ColliderTrait, math::Mat4Ext, prelude::Collider};
 
-// TODO: REMOVE THIS, HUGE HACK, added for bevy jam
-const GKJ_LOOP_LIMIT: u32 = 100;
-const EPA_LOOP_LIMIT: u32 = 1000;
-
-
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 struct Point {
     xyz: Vec3,  // The point on the minkowski sum
@@ -51,12 +46,7 @@ pub fn gjk_does_intersect(
     let mut closest_dist = f32::MAX;
     let mut new_dir = -simplex_points[0].xyz;
 
-    let mut gjk_tries = 0;
-
     loop {
-        if gjk_tries >= GKJ_LOOP_LIMIT {
-            return None;
-        }
 
         // Get the new point to check on
         let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, 0.0);
@@ -71,8 +61,7 @@ pub fn gjk_does_intersect(
 
         // If this new point hasn't moved past the origin then the origin can not be in the set
         // and therefore there is no collision.
-        let dotdot = new_dir.dot(new_pt.xyz - ORIGIN);
-        if dotdot < 0.0 {
+        if new_dir.dot(new_pt.xyz - ORIGIN) < 0.0 {
             return None;
         }
 
@@ -90,13 +79,11 @@ pub fn gjk_does_intersect(
 
         // Use the lambdas that support the new search direction and invalidate any points that
         // don't support it
-        sort_valids(&mut simplex_points, &mut lambdas);
-        num_pts = num_valids(&lambdas);
+        sort_valid(&mut simplex_points, &mut lambdas);
+        num_pts = num_valid(&lambdas);
         if num_pts == 4 {
             break;
         }
-
-        gjk_tries += 1;
     }
 
     // Check that we have a 3-simplex (EPA expects a tetrahedron)
@@ -198,12 +185,7 @@ fn epa_expand<T: ColliderTrait, K: ColliderTrait>(
     }
 
     // Expand the simplex to find the closest face of the CSO to the origin
-    let mut epa_tries = 0;
     loop {
-        if epa_tries >= EPA_LOOP_LIMIT {
-            return None;
-         }
-
 
         let tri = closest_triangle(&triangles, &points).unwrap();
         let normal = normal_direction(&tri, &points);
@@ -253,14 +235,9 @@ fn epa_expand<T: ColliderTrait, K: ColliderTrait>(
 
             triangles.push(triangle);
         }
-        epa_tries += 1;
     }
 
     // Get the projection of the origin on the closest triangle
-    let closest = closest_triangle(&triangles, &points);
-    if closest.is_none() {
-        info!("No closest triangle found");
-    }
     let tri = closest_triangle(&triangles, &points).unwrap();
     let pt_a = &points[tri.a as usize];
     let pt_b = &points[tri.b as usize];
@@ -324,8 +301,8 @@ pub fn gjk_closest_points(
         num_pts += 1;
 
         simple_signed_volumes(&simplex_points, num_pts, &mut new_dir, &mut lambdas);
-        sort_valids(&mut simplex_points, &mut lambdas);
-        num_pts = num_valids(&lambdas);
+        sort_valid(&mut simplex_points, &mut lambdas);
+        num_pts = num_valid(&lambdas);
 
         // check that the new projection of the origin onto the simplex is closer than the previous
         let dist = new_dir.length_squared();
@@ -603,11 +580,11 @@ fn signed_volume_3d(s1: Vec3, s2: Vec3, s3: Vec3, s4: Vec3) -> Vec4 {
 }
 
 /// Sorts the valid support points to the beginning of the array
-fn sort_valids(simplex_points: &mut [Point; 4], lambdas: &mut Vec4) {
-    let mut valids = [true; 4];
+fn sort_valid(simplex_points: &mut [Point; 4], lambdas: &mut Vec4) {
+    let mut valid = [true; 4];
     for i in 0..4 {
         if lambdas[i] == 0.0 {
-            valids[i] = false;
+            valid[i] = false;
         }
     }
 
@@ -615,21 +592,21 @@ fn sort_valids(simplex_points: &mut [Point; 4], lambdas: &mut Vec4) {
     let mut valid_count = 0;
     let mut valid_points = [Point::default(); 4];
     for i in 0..4 {
-        if valids[i] {
+        if valid[i] {
             valid_points[valid_count] = simplex_points[i];
             valid_lambdas[valid_count] = lambdas[i];
             valid_count += 1;
         }
     }
 
-    // Copy the valids back into simplex points
+    // Copy the valid back into simplex points
     for i in 0..4 {
         simplex_points[i] = valid_points[i];
         lambdas[i] = valid_lambdas[i];
     }
 }
 
-fn num_valids(lambdas: &Vec4) -> usize {
+fn num_valid(lambdas: &Vec4) -> usize {
     let mut num = 0;
     for i in 0..4 {
         if lambdas[i] != 0.0 {
@@ -765,7 +742,7 @@ fn find_dangling_edges(dangling_edges: &mut Vec<Edge>, triangles: &[Tri]) {
     }
 }
 
-// This borrows our signed volum code to perform the barycentric coordinates.
+// This borrows our signed volume code to perform the barycentric coordinates.
 fn barycentric_coordinates(s1: Vec3, s2: Vec3, s3: Vec3, pt: Vec3) -> Vec3 {
     let s1 = s1 - pt;
     let s2 = s2 - pt;

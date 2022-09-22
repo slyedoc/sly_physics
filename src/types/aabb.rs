@@ -1,24 +1,12 @@
 use std::ops::{Add, AddAssign};
-
-use bevy::{    
-    prelude::*,
-    render::{
-        mesh::Indices,
-        render_resource::{
-             PrimitiveTopology, ShaderType,
-        },        
-        extract_component::{ExtractComponent}
-    }, ecs::system::lifetimeless::Read,    
-};
-
+use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
 
-#[derive(Component, ShaderType, Debug, Inspectable,  Copy, Clone)]
+#[derive(Component, Debug, Inspectable,  Copy, Clone)]
 pub struct Aabb {
     pub mins: Vec3,
     pub maxs: Vec3,
 }
-
 
 impl Default for Aabb {
     fn default() -> Self {
@@ -26,47 +14,6 @@ impl Default for Aabb {
             mins: Vec3::splat(std::f32::MAX),
             maxs: Vec3::splat(std::f32::MIN),
         }
-    }
-}
-
-impl ExtractComponent for Aabb {
-    type Query = Read<Aabb>;
-
-    type Filter = ();
-
-    fn extract_component(item: bevy::ecs::query::QueryItem<Self::Query>) -> Self {
-        *item
-    }
-}
-
-impl From<&Aabb> for Mesh {
-    fn from(aabb: &Aabb) -> Self {
-        let verts = vec![
-            [aabb.maxs.x, aabb.maxs.y, aabb.mins.z],
-            [aabb.mins.x, aabb.maxs.y, aabb.mins.z],
-            [aabb.mins.x, aabb.maxs.y, aabb.maxs.z],
-            [aabb.maxs.x, aabb.maxs.y, aabb.maxs.z],
-            [aabb.maxs.x, aabb.mins.y, aabb.mins.z],
-            [aabb.mins.x, aabb.mins.y, aabb.mins.z],
-            [aabb.mins.x, aabb.mins.y, aabb.maxs.z],
-            [aabb.maxs.x, aabb.mins.y, aabb.maxs.z],
-        ];
-
-        let uvs = vec![[0.0, 0.0]; 8];
-        let normals = vec![[0.0, 0.0, 1.0]; 8];
-
-        let indices = Indices::U32(vec![
-            0, 1, 1, 2, 2, 3, 3, 0, // Top ring
-            4, 5, 5, 6, 6, 7, 7, 4, // Bottom ring
-            0, 4, 1, 5, 2, 6, 3, 7, // Verticals
-        ]);
-
-        let mut mesh = Mesh::new(PrimitiveTopology::LineList);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, verts);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-        mesh.set_indices(Some(indices));
-        mesh
     }
 }
 
@@ -107,7 +54,7 @@ impl Aabb {
         true
     }
 
-    // TODO: preformance test form_points vs grow vs add_assign vs expand_by_point, all doing same thing
+    // TODO: performance test form_points vs grow vs add_assign vs expand_by_point, all doing same thing
     pub fn from_points(pts: &[Vec3]) -> Self {
         pts.iter().fold(Aabb::default(), |acc, pt| acc + *pt)
     }

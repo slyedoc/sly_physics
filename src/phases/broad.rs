@@ -1,14 +1,11 @@
 use bevy::prelude::*;
 
-use crate::{
-    bvh::Tlas,
-    types::*,
-};
+use crate::{bvh::Tlas, types::*};
 
 // Sweep and Prune
-// The board phase is responsible for pruning the search space of possable collisions
+// The board phase is responsible for pruning the search space of possible collisions
 // I have tried different approaches, and I am sure I will try a few more
-// So far this simple approach has been the faster
+// So far this simple approach has been the fastest
 #[allow(dead_code)]
 pub fn broad_phase(
     mut broad_contacts: EventWriter<BroadContact>,
@@ -27,7 +24,6 @@ pub fn broad_phase(
     for (i, (a, aabb_a, static_a)) in list.iter().enumerate() {
         // Test collisions against all possible overlapping AABBs following current one
         for (b, aabb_b, static_b) in list.iter().skip(i + 1) {
-
             // Stop when tested AABBs are beyond the end of current AABB
             if aabb_b.mins.x > aabb_a.maxs.x {
                 break;
@@ -61,23 +57,19 @@ pub fn broad_phase(
             }
 
             if a.id() < b.id() {
-                broad_contacts.send(BroadContact {
-                    a: *a,
-                    b: *b,
-                });
+                broad_contacts.send(BroadContact { a: *a, b: *b });
             } else {
-                broad_contacts.send(BroadContact {
-                    a: *b,
-                    b: *a,
-                });
+                broad_contacts.send(BroadContact { a: *b, b: *a });
             }
-            
         }
     }
 }
 
 #[allow(dead_code)]
-fn cmp_x_axis(a: &(Entity, &Aabb, Option<&Static>), b: &(Entity, &Aabb, Option<&Static>)) -> std::cmp::Ordering {
+fn cmp_x_axis(
+    a: &(Entity, &Aabb, Option<&Static>),
+    b: &(Entity, &Aabb, Option<&Static>),
+) -> std::cmp::Ordering {
     // Sort on minimum value along either x, y, or z axis
     let min_a = a.1.mins.x;
     let min_b = b.1.mins.x;
@@ -91,7 +83,10 @@ fn cmp_x_axis(a: &(Entity, &Aabb, Option<&Static>), b: &(Entity, &Aabb, Option<&
 }
 
 #[allow(dead_code)]
-fn cmp_y_axis(a: &(Entity, &Aabb, Option<&Static>), b: &(Entity, &Aabb, Option<&Static>)) -> std::cmp::Ordering {
+fn cmp_y_axis(
+    a: &(Entity, &Aabb, Option<&Static>),
+    b: &(Entity, &Aabb, Option<&Static>),
+) -> std::cmp::Ordering {
     // Sort on minimum value along either x, y, or z axis
     let min_a = a.1.mins.y;
     let min_b = b.1.mins.y;
@@ -105,7 +100,10 @@ fn cmp_y_axis(a: &(Entity, &Aabb, Option<&Static>), b: &(Entity, &Aabb, Option<&
 }
 
 #[allow(dead_code)]
-fn cmp_z_axis(a: &(Entity, Aabb, Option<&Static>), b: &(Entity, Aabb, Option<&Static>)) -> std::cmp::Ordering {
+fn cmp_z_axis(
+    a: &(Entity, Aabb, Option<&Static>),
+    b: &(Entity, Aabb, Option<&Static>),
+) -> std::cmp::Ordering {
     // Sort on minimum value along either x, y, or z axis
     let min_a = a.1.mins.z;
     let min_b = b.1.mins.z;
@@ -118,43 +116,83 @@ fn cmp_z_axis(a: &(Entity, Aabb, Option<&Static>), b: &(Entity, Aabb, Option<&St
     std::cmp::Ordering::Equal
 }
 
-
-// TODO: The we should be able to traverse the bvh tree, 'tlas' in our case, for possable collision detection
+// TODO: The we should be able to traverse the bvh tree, 'tlas' in our case, for possible collision detection
 // This was as the one of the main reason i added bvh
 // I am missing something here, and this is broken
-#[allow(dead_code)]
-pub fn broadphase_system_bvh(tlas: Res<Tlas>, mut broad_contacts: EventWriter<BroadContact>) {
-    let mut a = tlas.tlas_nodes[0].left();
-    let mut b = tlas.tlas_nodes[0].right();
-    let mut stack = Vec::new();
-    loop {
-        //info!("test a: {}, b: {}", a, b);
-        if tlas.tlas_nodes[a].aabb.intersection(&tlas.tlas_nodes[b].aabb) {
-            if tlas.tlas_nodes[a].is_leaf() && tlas.tlas_nodes[b].is_leaf() {
-                // At leaf nodes. Perform collision tests on leaf node contents
-                broad_contacts.send(BroadContact {
-                    a: tlas.blas[tlas.tlas_nodes[a].blas as usize].entity,
-                    b: tlas.blas[tlas.tlas_nodes[b].blas as usize].entity,
-                });
-                //info!("broad contact a: {}, b: {}", a, b);
-                // Could have an exit rule here (eg. exit on first hit)
 
-            } else if !tlas.tlas_nodes[a].is_leaf() { // ‘Descend A’ descent rule
-                    stack.push((tlas.tlas_nodes[a].right(), b));
-                    a = tlas.tlas_nodes[a].left();
-                    continue;
+#[allow(dead_code)]
+pub fn broad_phase_bvh(
+    tlas: Res<Tlas>,
+    mut broad_contacts: EventWriter<BroadContact>,
+    mut stack: Local<Vec<(usize, usize)>>,
+    mut completed: Local<Vec<(usize, usize)>>,
+    mut static_query: Query<Entity, With<Static>>,
+) {
+    let tlas = tlas.into_inner();
+
+    stack.clear();
+    completed.clear();
+
+    let root = &tlas.nodes[0];
+    stack.push((root.left(), root.right()));
+
+    let mut count = 0;
+    let mut skipped = 0;
+    let mut static_count = 0;
+
+    while let Some((a, b)) = stack.pop() {
+        if completed.contains(&(a, b)) {
+            skipped += 1;
+            continue;
+        }
+
+        let node_a = &tlas.nodes[a];
+        let node_b = &tlas.nodes[b];
+
+        if node_a.aabb.intersection(&node_b.aabb) {
+            let leaf_a = node_a.is_leaf();
+            let leaf_b = node_b.is_leaf();
+
+            if leaf_a && leaf_b {
+                // possible collision
+                let entity_a = tlas.blas[node_a.blas as usize].entity;
+                let entity_b = tlas.blas[node_b.blas as usize].entity;
+
+                // if both are not static send broad collision
+                if let Err(_) = static_query.get_many_mut([entity_a, entity_b]) {
+                    broad_contacts.send(BroadContact {
+                        a: tlas.blas[node_a.blas as usize].entity,
+                        b: tlas.blas[node_b.blas as usize].entity,
+                    });
+                } else {
+                    static_count += 1;
+                }
             } else {
-                stack.push((a, tlas.tlas_nodes[b].right()));
-                b = tlas.tlas_nodes[b].left();
-                continue;
+                // ‘Descend A’ descent rule
+                if !leaf_a {
+                    stack.push((node_a.right(), b));
+                    stack.push((node_a.left(), b));
+                    
+                    //children
+                    if completed.contains(&(node_a.left(), node_a.right())) {
+                        info!("should not happen");
+                    }
+                    stack.push((node_a.left(), node_a.right()));
+
+                } else {
+                    stack.push((a, node_b.right()));
+                    stack.push((a, node_b.left()));
+
+                    //children
+                    //stack.push((node_b.left(), node_b.right()));
+                }
             }
-            
         }
-        if let Some((new_a, new_b)) = stack.pop() {
-            a = new_a;
-            b = new_b;
-        } else {
-            break;
-        }
+        completed.push((a, b));
+        count += 1;
     }
+    info!(
+        "count: {}, skipped {}, static {}",
+        count, skipped, static_count
+    );
 }

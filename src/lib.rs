@@ -17,13 +17,13 @@ use bevy_inspector_egui::prelude::*;
 
 use constraints::PenetrationArena;
 use iyes_loopless::prelude::*;
-use phases::{broad_phase, narrow_phase, resolve_phase};
+use phases::*;
 
 use bvh::*;
 use colliders::*;
 use types::*;
 
-pub const PHYSISCS_TIMESTEP: f64 = 1.0 / 60.0;
+pub const PHYSICS_TIMESTEP: f64 = 1.0 / 60.0;
 
 const MAX_MANIFOLD_CONTACTS: usize = 4;
 const MAX_SOLVE_ITERS: u32 = 5; // TODO: only valid 1-5
@@ -47,7 +47,7 @@ pub mod prelude {
         dynamics::*, types::Aabb, types::RBHelper, types::CenterOfMass, types::Elasticity,
         types::Friction, types::InertiaTensor, types::Velocity, types::Mass, types::InverseMass, types::InverseInertiaTensor,
         types::RigidBody, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState,
-        PhysicsSystems, RigidBodyBundle, PHYSISCS_TIMESTEP,
+        PhysicsSystems, RigidBodyBundle, PHYSICS_TIMESTEP,
     };
 }
 
@@ -84,7 +84,7 @@ pub struct PhysicsConfig {
 impl Default for PhysicsConfig {
     fn default() -> Self {
         PhysicsConfig {
-            time: PHYSISCS_TIMESTEP as f32,
+            time: PHYSICS_TIMESTEP as f32,
         }
     }
 }
@@ -163,7 +163,8 @@ impl Plugin for PhysicsPlugin {
                     .run_in_state(PhysicsState::Running)
                     .label(PhysicsSystems::Broad)
                     .after(PhysicsSystems::UpdateBvh)
-                    .with_system(broad_phase)
+                    //.with_system(broad_phase)
+                    .with_system(broad_phase_bvh)
                     .into(),
             )
             .add_system_set_to_stage(
@@ -175,7 +176,7 @@ impl Plugin for PhysicsPlugin {
                     .with_system(narrow_phase)
                     .into(),
             )
-            // Contraints
+            // Constraints
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
@@ -405,7 +406,7 @@ fn update_bvh(query: Query<(&Transform, &Aabb)>, mut tlas: ResMut<Tlas>) {
 
 }
 
-// TODO: We dont really want to copy the all tris twice, find better way
+// TODO: We don't really want to copy the all tris twice, find better way
 pub fn parse_mesh(mesh: &Mesh) -> (Vec<Vec3>, Vec<TriIndexed>, Vec<BvhTri>) {
     match mesh.primitive_topology() {
         bevy::render::mesh::PrimitiveTopology::TriangleList => {
@@ -449,7 +450,7 @@ pub fn parse_mesh(mesh: &Mesh) -> (Vec<Vec3>, Vec<TriIndexed>, Vec<BvhTri>) {
     }
 }
 
-// TODO: We dont really want to copy the all tris, find better way
+// TODO: We don't really want to copy the all tris, find better way
 pub fn parse_bvh_mesh(mesh: &Mesh) -> Vec<BvhTri> {
     match mesh.primitive_topology() {
         bevy::render::mesh::PrimitiveTopology::TriangleList => {
@@ -486,7 +487,7 @@ pub fn parse_bvh_mesh(mesh: &Mesh) -> Vec<BvhTri> {
     }
 }
 
-// TODO: We dont really want to copy the all tris, find better way
+// TODO: We don't really want to copy the all tris, find better way
 pub fn parse_verts(mesh: &Mesh) -> Vec<Vec3> {
     match mesh.primitive_topology() {
         bevy::render::mesh::PrimitiveTopology::TriangleList => {

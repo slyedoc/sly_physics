@@ -23,7 +23,7 @@ impl Default for Hit {
             u: Default::default(),
             v: Default::default(),
             tri_index: Default::default(),
-            // TODO: Yes this isnt ideal, should be an option, will come back to this
+            // TODO: Yes this isn't ideal, should be an option, will come back to this
             entity: Entity::from_raw(0),
         }
     }
@@ -150,18 +150,18 @@ impl Ray {
         let _span = info_span!("intersect_aabb").entered();
         let tx1 = (aabb.mins.x - self.origin.x) * self.direction_inv.x;
         let tx2 = (aabb.maxs.x - self.origin.x) * self.direction_inv.x;
-        let tmin = tx1.min(tx2);
-        let tmax = tx1.max(tx2);
+        let mut t_min = tx1.min(tx2);
+        let mut t_max = tx1.max(tx2);
         let ty1 = (aabb.mins.y - self.origin.y) * self.direction_inv.y;
         let ty2 = (aabb.maxs.y - self.origin.y) * self.direction_inv.y;
-        let tmin = tmin.max(ty1.min(ty2));
-        let tmax = tmax.min(ty1.max(ty2));
+        t_min = t_min.max(ty1.min(ty2));
+        t_max = t_max.min(ty1.max(ty2));
         let tz1 = (aabb.mins.z - self.origin.z) * self.direction_inv.z;
         let tz2 = (aabb.maxs.z - self.origin.z) * self.direction_inv.z;
-        let tmin = tmin.max(tz1.min(tz2));
-        let tmax = tmax.min(tz1.max(tz2));
+        t_min = t_min.max(tz1.min(tz2));
+        t_max = t_max.min(tz1.max(tz2));
 
-        // Most intersect test would return here with a tmax and min test
+        // Most intersect test would return here with a t_max and min test
         // but we are also sorting 
         let t_hit = if let Some(hit) = self.hit {
             hit.distance
@@ -169,8 +169,8 @@ impl Ray {
             f32::MAX
         };
 
-        if tmax >= tmin && tmin < t_hit && tmax > 0.0 {
-            tmin
+        if t_max >= t_min && t_min < t_hit && t_max > 0.0 {
+            t_min
         } else {
             f32::MAX
         }
@@ -184,7 +184,7 @@ impl Ray {
         loop {
             if node.is_leaf() {
                 for i in 0..node.tri_count {
-                    let tri_index = bvh.triangle_indexs[(node.left_first + i) as usize];
+                    let tri_index = bvh.triangle_indexes[(node.left_first + i) as usize];
                     self.intersect_triangle(&bvh.tris[tri_index], tri_index, entity);
                 }
                 if stack.is_empty() {
@@ -215,10 +215,10 @@ impl Ray {
         }
     }
 
-    pub fn intersect_bvh_instance(&mut self, bvh_instance: &BvhInstance, bvhs: &[Bvh]) {
+    pub fn intersect_bvh_instance(&mut self, bvh_instance: &BvhInstance, bounding_volumes_hierarchies: &[Bvh]) {
         #[cfg(feature = "trace")]
         let _span = info_span!("intersect_bvh_instance").entered();
-        let bvh = &bvhs[bvh_instance.bvh_index];
+        let bvh = &bounding_volumes_hierarchies[bvh_instance.bvh_index];
         // backup ray and transform original
         let mut backup_ray = *self;
 
@@ -233,14 +233,14 @@ impl Ray {
     }
 
     pub fn intersect_tlas(&mut self, tlas: &Tlas) -> Option<Hit> {        
-        if tlas.tlas_nodes.is_empty() || tlas.blas.is_empty() {
+        if tlas.nodes.is_empty() || tlas.blas.is_empty() {
             return None;
         }
         let mut stack = Vec::<&TlasNode>::with_capacity(64);
-        let mut node = &tlas.tlas_nodes[0];
+        let mut node = &tlas.nodes[0];
         loop {
             if node.is_leaf() {
-                self.intersect_bvh_instance(&tlas.blas[node.blas as usize], &tlas.bvhs);
+                self.intersect_bvh_instance(&tlas.blas[node.blas as usize], &tlas.bounding_volumes);
                 if stack.is_empty() {
                     break;
                 } else {
@@ -248,8 +248,8 @@ impl Ray {
                 }
                 continue;
             }
-            let mut child1 = &tlas.tlas_nodes[(node.left_right & 0xffff) as usize];
-            let mut child2 = &tlas.tlas_nodes[(node.left_right >> 16) as usize];
+            let mut child1 = &tlas.nodes[(node.left_right & 0xffff) as usize];
+            let mut child2 = &tlas.nodes[(node.left_right >> 16) as usize];
             let mut dist1 = self.intersect_aabb(&child1.aabb);
             let mut dist2 = self.intersect_aabb(&child2.aabb);
             if dist1 > dist2 {

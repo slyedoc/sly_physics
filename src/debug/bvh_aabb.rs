@@ -101,7 +101,7 @@ fn extract_bvh_aabbs(
 ) {
     bvh_aabbs.data.clear();
     if current_state.0 == PhysicsDebugState::Running {
-        for node in tlas.tlas_nodes.iter() {
+        for node in tlas.nodes.iter() {
             if !node.is_leaf() {
                 bvh_aabbs.data.push(node.aabb);
             }
