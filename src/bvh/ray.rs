@@ -240,7 +240,7 @@ impl Ray {
         let mut node = &tlas.nodes[0];
         loop {
             if node.is_leaf() {
-                self.intersect_bvh_instance(&tlas.blas[node.blas as usize], &tlas.bounding_volumes);
+                self.intersect_bvh_instance(&tlas.blas[node.blas as usize], &tlas.colliders);
                 if stack.is_empty() {
                     break;
                 } else {

@@ -6,8 +6,6 @@ use sly_physics::prelude::*;
 mod helper;
 
 fn main() {
-
-
     App::new()
         .insert_resource(WindowDescriptor {
             present_mode: PresentMode::Fifo,
@@ -15,20 +13,16 @@ fn main() {
         })
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::default())
-        
         // out plugins
         .add_plugin(PhysicsPlugin)
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
         .add_plugin(PhysicsBvhCameraPlugin)
-        
         .add_plugin(HelperPlugin)
         .add_startup_system(helper::setup_camera)
         .add_enter_system(AppState::Playing, helper::setup_room)
         .add_enter_system(AppState::Playing, setup)
         .run();
-
-        
 }
 
 pub fn setup(
@@ -38,8 +32,6 @@ pub fn setup(
     mut colliders: ResMut<Assets<Collider>>,
     asset_server: Res<AssetServer>,
 ) {
-
-
     error!("This example fails, using it to track down an error!");
 
     let box_a = colliders.add(Collider::from(Box::new(Vec3::ONE)));

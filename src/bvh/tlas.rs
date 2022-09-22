@@ -1,6 +1,8 @@
-use bevy::{prelude::*};
+use bevy::{asset::HandleId, prelude::*, math::vec3};
 
-use crate::{types::Aabb, Bvh, BvhInstance};
+use crate::{prelude::Collider, types::Aabb, Bvh, BvhInstance};
+
+use super::BvhTri;
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct TlasNode {
@@ -29,7 +31,7 @@ impl TlasNode {
 pub struct Tlas {
     pub nodes: Vec<TlasNode>,
     pub blas: Vec<BvhInstance>,
-    pub bounding_volumes: Vec<Bvh>,
+    pub colliders: Vec<Bvh>,
 }
 
 impl Default for Tlas {
@@ -37,15 +39,43 @@ impl Default for Tlas {
         Tlas {
             nodes: Vec::with_capacity(0),
             blas: Default::default(),
-            bounding_volumes: Default::default(),
+            colliders: Default::default(),
         }
     }
 }
 
 impl Tlas {
+    pub fn add(&mut self, colider_id: HandleId, collider: &Collider, entity: Entity) {
+        match collider {
+            Collider::Sphere(sphere) => {
+                let bvh_mesh = Mesh::from(shape::UVSphere {
+                    radius: sphere.radius,
+                    sectors: 6,
+                    stacks: 6,
+                });
+
+                let bvh_tri = parse_bvh_mesh(&bvh_mesh);
+                //info!("e: {:?} bvh_tri: {:?}", e, bvh_tri);
+                let bvh_index = self.add_bvh(Bvh::new(bvh_tri));
+                self.add_instance(BvhInstance::new(entity, bvh_index));
+            }
+            Collider::Box(b) => {
+                let bvh_mesh = Mesh::from(shape::Box::new(b.size.x, b.size.y, b.size.z));
+                let bvh_tri = parse_bvh_mesh(&bvh_mesh);
+                let bvh_index = self.add_bvh(Bvh::new(bvh_tri));
+                self.add_instance(BvhInstance::new(entity, bvh_index));
+            }
+            Collider::Convex(convex) => {
+                let bvh_mesh = Mesh::from(convex);
+                let bvh_tri = parse_bvh_mesh(&bvh_mesh);
+                let bvh_index = self.add_bvh(Bvh::new(bvh_tri));
+                self.add_instance(BvhInstance::new(entity, bvh_index));
+            }
+        }
+    }
     pub fn add_bvh(&mut self, bvh: Bvh) -> usize {
-        self.bounding_volumes.push(bvh);
-        self.bounding_volumes.len() - 1
+        self.colliders.push(bvh);
+        self.colliders.len() - 1
     }
 
     pub fn add_instance(&mut self, instance: BvhInstance) {
@@ -129,11 +159,10 @@ impl Tlas {
     pub fn update_bvh_instances(&mut self, query: &Query<(&Transform, &Aabb)>) {
         let mut remove_list = Vec::new();
         for instance in &mut self.blas {
-            if let Ok( (trans, aabb) ) = query.get(instance.entity) {
+            if let Ok((trans, aabb)) = query.get(instance.entity) {
                 let trans_matrix = trans.compute_matrix();
                 instance.inv_trans = trans_matrix.inverse();
                 instance.bounds = *aabb;
-
             } else {
                 remove_list.push(instance.entity);
             }
@@ -141,5 +170,43 @@ impl Tlas {
 
         //remove any not found
         self.blas.retain(|b| !remove_list.contains(&b.entity))
+    }
+}
+
+
+// TODO: We don't really want to copy the all tris, find better way
+pub fn parse_bvh_mesh(mesh: &Mesh) -> Vec<BvhTri> {
+    match mesh.primitive_topology() {
+        bevy::render::mesh::PrimitiveTopology::TriangleList => {
+            let indexes = match mesh.indices().expect("No Indices") {
+                bevy::render::mesh::Indices::U32(vec) => vec,
+                _ => todo!(),
+            };
+
+            let verts = match mesh
+                .attribute(Mesh::ATTRIBUTE_POSITION)
+                .expect("No Position Attribute")
+            {
+                bevy::render::mesh::VertexAttributeValues::Float32x3(vec) => {
+                    vec.iter().map(|vec| vec3(vec[0], vec[1], vec[2]))
+                }
+                _ => todo!(),
+            }
+            .collect::<Vec<_>>();
+
+            let mut triangles = Vec::with_capacity(indexes.len() / 3);
+            for tri_indexes in indexes.chunks(3) {
+                let v0 = verts[tri_indexes[0] as usize];
+                let v1 = verts[tri_indexes[1] as usize];
+                let v2 = verts[tri_indexes[2] as usize];
+                triangles.push(BvhTri::new(
+                    vec3(v0[0], v0[1], v0[2]),
+                    vec3(v1[0], v1[1], v1[2]),
+                    vec3(v2[0], v2[1], v2[2]),
+                ));
+            }
+            triangles
+        }
+        _ => todo!(),
     }
 }

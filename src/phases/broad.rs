@@ -174,17 +174,11 @@ pub fn broad_phase_bvh(
                     stack.push((node_a.left(), b));
                     
                     //children
-                    if completed.contains(&(node_a.left(), node_a.right())) {
-                        info!("should not happen");
-                    }
                     stack.push((node_a.left(), node_a.right()));
 
                 } else {
                     stack.push((a, node_b.right()));
                     stack.push((a, node_b.left()));
-
-                    //children
-                    //stack.push((node_b.left(), node_b.right()));
                 }
             }
         }
