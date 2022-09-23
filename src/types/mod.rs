@@ -1,11 +1,8 @@
 mod aabb;
-use bevy::prelude::*;
-use bevy_inspector_egui::Inspectable;
-
 pub use aabb::*;
-
 use crate::{MAX_ANGULAR_SPEED, MAX_ANGULAR_SPEED_SQ};
 
+use bevy::prelude::*;
 #[derive(Debug)]
 pub struct BroadContact {
     pub a: Entity,
@@ -28,29 +25,33 @@ pub struct Contact {
 pub struct RBHelper;
 
 impl RBHelper {
+    #[inline]
     pub fn world_to_local(trans: &Transform, com: &CenterOfMass, world_point: Vec3) -> Vec3 {
         let com_world = trans.translation + trans.rotation * com.0;
         let inv_orientation = trans.rotation.conjugate();
         inv_orientation * (world_point - com_world)
     }
 
+    #[inline]
     pub fn local_to_world(trans: &Transform, com: &CenterOfMass, local_point: Vec3) -> Vec3 {
         let com_world = trans.translation + trans.rotation * com.0;
         com_world + trans.rotation * local_point
     }
 
-    pub fn inv_intertia_tensor_world(
+    #[inline]
+    pub fn inv_inertia_tensor_world(
         trans: &Transform,
         inv_inertia_tensor: &InverseInertiaTensor,
     ) -> Mat3 {
         let orientation = Mat3::from_quat(trans.rotation);
         orientation * inv_inertia_tensor.0 * orientation.transpose()
     }
-
+    #[inline]
     pub fn centre_of_mass_world(t: &Transform, com: &CenterOfMass) -> Vec3 {
         t.translation + t.rotation * com.0
     }
 
+    #[inline]
     #[allow(clippy::too_many_arguments)]
     pub fn apply_impulse(
         trans: &Transform,
@@ -73,6 +74,7 @@ impl RBHelper {
         RBHelper::apply_impulse_angular(trans, velocity, inv_mass, inv_inertia_tensor, dl);
     }
 
+    #[inline]
     pub fn apply_impulse_linear(
         velocity: &mut Velocity,
         inv_mass: &InverseMass,
@@ -100,14 +102,15 @@ impl RBHelper {
         // L = I w = r x p
         // dL = I dw = r x J
         // => dw = I^-1 * (r x J)
-        velocity.angular += RBHelper::inv_intertia_tensor_world(trans, inv_inertia_tensor) * impulse;
+        velocity.angular += RBHelper::inv_inertia_tensor_world(trans, inv_inertia_tensor) * impulse;
 
         // clamp angular_velocity
         if velocity.angular.length_squared() > MAX_ANGULAR_SPEED_SQ {
             velocity.angular = velocity.angular.normalize() * MAX_ANGULAR_SPEED;
         }
     }
-
+    
+    #[inline]
     pub fn update(
         transform: &mut Transform,
         velocity: &mut Velocity,        
@@ -146,7 +149,8 @@ impl RBHelper {
     }
 }
 
-#[derive(Component, Inspectable, Debug, PartialEq, Eq)]
+#[derive(Component, Reflect, Debug, PartialEq, Eq, Clone, Copy)]
+#[reflect(Component)]
 pub enum RigidBody {
     Static,
     Dynamic,
@@ -158,18 +162,19 @@ impl Default for RigidBody {
     }
 }
 
-#[derive(Component, Inspectable, Debug)]
+#[derive(Component, Debug)]
 pub struct Static;
 
-#[derive(Component, Reflect, Debug, Default)]
+#[derive(Component, Reflect, Debug, Default, Clone, Copy)]
 #[reflect(Component)]
 pub struct Velocity {
     pub linear: Vec3,
     pub angular: Vec3,
 }
 
-/// assumed [0,1]
-#[derive(Component, Deref, DerefMut, Inspectable, Debug)]
+/// assumed 0.0..=1.0
+#[derive(Component, Deref, DerefMut, Reflect, Debug)]
+#[reflect(Component)]
 pub struct Elasticity(pub f32); 
 
 impl Default for Elasticity {
@@ -178,8 +183,9 @@ impl Default for Elasticity {
     }
 }
 
-/// assumed [0,1]
-#[derive(Component, Deref, DerefMut, Inspectable, Debug)]
+/// assumed 0.0..=1.0
+#[derive(Component, Deref, DerefMut, Reflect, Debug)]
+#[reflect(Component)]
 pub struct Friction(pub f32); 
 
 impl Default for Friction {
@@ -188,7 +194,8 @@ impl Default for Friction {
     }
 }
 
-#[derive(Component, Deref, DerefMut, Inspectable, Debug)]
+#[derive(Component, Deref, DerefMut, Reflect, Debug)]
+#[reflect(Component)]
 pub struct Mass(pub f32);
 
 impl Default for Mass {
@@ -197,16 +204,20 @@ impl Default for Mass {
     }
 }
 
-#[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
+#[derive(Component, Deref, DerefMut, Reflect, Debug, Default)]
+#[reflect(Component)]
 pub struct InverseMass(pub f32);
 
-#[derive(Component, Inspectable, Debug, Default)]
+#[derive(Component, Deref, DerefMut, Reflect,  Debug, Default)]
+#[reflect(Component)]
 pub struct CenterOfMass(pub Vec3);
 
-#[derive(Component, Deref, DerefMut, Inspectable, Debug, Default)]
+#[derive(Component, Deref, DerefMut, Reflect, Debug, Default)]
+#[reflect(Component)]
 pub struct InertiaTensor(pub Mat3);
 
-#[derive(Component, Inspectable, Debug)]
+#[derive(Component, Reflect, Debug)]
+#[reflect(Component)]
 pub struct Drag {
     pub linear_velocity: f32,
 }
@@ -219,13 +230,8 @@ impl Default for Drag {
     }
 }
 
-#[derive(Component, Inspectable, Debug, Default)]
+#[derive(Component, Reflect, Debug, Default)]
+#[reflect(Component)]
 pub struct InverseInertiaTensor(pub Mat3);
-
-#[derive(Debug, Default)]
-pub struct CenterOfMassWorld(pub Vec3);
-
-#[derive(Debug, Default)]
-pub struct InverseInertiaTensorWorld(pub Mat3);
 
 

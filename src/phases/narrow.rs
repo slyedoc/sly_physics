@@ -1,152 +1,162 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, tasks::*};
 
-use crate::{colliders::*, constraints::PenetrationArena, intersect::*, types::*, PhysicsConfig};
+use crate::{colliders::*, constraints::ContactArena, intersect::*, types::*, PhysicsConfig};
 
 #[cfg(feature = "continuous")]
 pub fn narrow_phase(
-    mut query: Query<(
-        &mut Transform,
-        &Handle<Collider>,        
-        &mut Velocity,
+    query: Query<(
+        Entity,
+        &Transform,
+        &Handle<Collider>,
+        &Velocity,
         &CenterOfMass,
         &InertiaTensor,
     )>,
     mut broad_contacts: EventReader<BroadContact>,
     mut contacts: EventWriter<Contact>,
-    mut manifold_arena: ResMut<PenetrationArena>,
+    mut manifold_arena: ResMut<ContactArena>,
     config: Res<PhysicsConfig>,
     colliders: Res<Assets<Collider>>,
+
 ) {
+    //let start = Instant::now();
+    // TODO: after 0.8 ComputeTaskPool::get() fails, using this for now
+    // let broad_contacts = broad_contacts.iter().map(|pair| {
+    //     query.get_many([pair.a, pair.b]).unwrap()            
+    // }).collect::<Vec<_>>();
+    //info!("Narrow Phase: {} contacts", broad_contacts.len());
 
-    // let count = broad_contacts.iter().len();
-    // info!("Narrow Phase: {} contacts", count);
-    for pair in broad_contacts.iter() {
-        let bodies = query.get_many_mut([pair.a, pair.b]);
-        let [(mut trans_a, col_a, mut vel_a, com_a, i_tensor_a), (mut trans_b, col_b, mut vel_b, com_b, i_tensor_b)] =
-            bodies.unwrap();
+  
+    let contact_results = broad_contacts.iter()
+    .collect::<Vec<_>>()
+    .par_splat_map(ComputeTaskPool::get(), None, |chunk| {
+        #[cfg(feature = "trace")]
+        let _span = info_span!("narrow_phase").entered();
+        let mut contact_results = Vec::new();
+        //let mut contact_results = Vec::new();
+        //for broad_contact in broad_contacts.iter()
+        for broad_contact in chunk.iter()
+        {
+           let [
+                (a, trans_a, col_a, vel_a, com_a, i_tensor_a),
+                (b, trans_b, col_b, vel_b, com_b, i_tensor_b),
+            ] = query.get_many([broad_contact.a, broad_contact.b]).unwrap();
 
-        // TODO: ideally we can use different collision test between different shapes, for now really only sphere sphere has its own
-        // and due to avoiding dynamic dispatching we have split everything out, in hind sight we really should have just started with dynamic dispatching
-        // and removed it later if testing show it was faster, at this point I may not be and it does create a lot of boiler plate and code duplication
-        let collider_a = colliders.get(col_a).unwrap();
-        let collider_b = colliders.get(col_b).unwrap();
+            let collider_a = colliders.get(col_a).unwrap();
+            let collider_b = colliders.get(col_b).unwrap();
 
-        if let Some(contact) = match (collider_a, collider_b) {
-            (Collider::Sphere(sphere_a), Collider::Sphere(sphere_b)) => {
-                if let Some((world_point_a, world_point_b, time_of_impact)) = sphere_sphere_dynamic(
-                    sphere_a.radius,
-                    sphere_b.radius,
-                    trans_a.translation,
-                    trans_b.translation,
-                    vel_a.linear,
-                    vel_b.linear,
-                    config.time,
-                ) {
-                    // step bodies forward to get local space collision points
-                    RBHelper::update(
-                        &mut trans_a,
-                        &mut vel_a,                        
-                        com_a,
-                        i_tensor_a,
-                        time_of_impact,
-                    );
+            if let Some(contact) = match (collider_a, collider_b) {
+                (Collider::Sphere(sphere_a), Collider::Sphere(sphere_b)) => {
+                    if let Some((world_point_a, world_point_b, time_of_impact)) =
+                        sphere_sphere_dynamic(
+                            sphere_a.radius,
+                            sphere_b.radius,
+                            trans_a.translation,
+                            trans_b.translation,
+                            vel_a.linear,
+                            vel_b.linear,
+                            config.time,
+                        )
+                    {
+                        let trans_a = &mut trans_a.clone();
+                        let vel_a = &mut vel_a.clone();
 
-                    RBHelper::update(
-                        &mut trans_b,
-                        &mut vel_b,                        
-                        com_b,
-                        i_tensor_b,
-                        time_of_impact,
-                    );
+                        let trans_b = &mut trans_b.clone();
+                        let vel_b = &mut vel_b.clone();
 
-                    // convert world space contacts to local space
-                    let local_point_a = RBHelper::world_to_local(&trans_a, com_a, world_point_a);
-                    let local_point_b = RBHelper::world_to_local(&trans_b, com_b, world_point_b);
+                        // step bodies forward to get local space collision points
+                        RBHelper::update(trans_a, vel_a, com_a, i_tensor_a, time_of_impact);
 
-                    let normal = (trans_a.translation - trans_b.translation).normalize();
+                        RBHelper::update(trans_b, vel_b, com_b, i_tensor_b, time_of_impact);
 
-                    // unwind time step
-                    RBHelper::update(
-                        &mut trans_a,
-                        &mut vel_a,
-                        com_a,
-                        i_tensor_a,
-                        -time_of_impact,
-                    );
-                    RBHelper::update(
-                        &mut trans_b,
-                        &mut vel_b,
-                        com_b,
-                        i_tensor_b,
-                        -time_of_impact,
-                    );
+                        // convert world space contacts to local space
+                        let local_point_a =
+                            RBHelper::world_to_local(trans_a, com_a, world_point_a);
+                        let local_point_b =
+                            RBHelper::world_to_local(trans_b, com_b, world_point_b);
 
-                    // calculate the separation distance
-                    let ab = trans_a.translation - trans_b.translation;
-                    let separation_dist = ab.length() - (sphere_a.radius + sphere_b.radius);
+                        let normal = (trans_a.translation - trans_b.translation).normalize();
 
-                    Some(Contact {
-                        a: pair.a,
-                        b: pair.b,
-                        world_point_a,
-                        world_point_b,
-                        local_point_a,
-                        local_point_b,
-                        normal,
-                        separation_dist,
-                        time_of_impact,
-                    })
-                } else {
-                    None
+                        // calculate the separation distance
+                        let ab = trans_a.translation - trans_b.translation;
+                        let separation_dist = ab.length() - (sphere_a.radius + sphere_b.radius);
+
+                        Some(Contact {
+                            a,
+                            b,
+                            world_point_a,
+                            world_point_b,
+                            local_point_a,
+                            local_point_b,
+                            normal,
+                            separation_dist,
+                            time_of_impact,
+                        })
+                    } else {
+                        None
+                    }
                 }
-            }
-            (collider_a, collider_b) => {
-
-                conservative_advancement(
+                (collider_a, collider_b) => conservative_advancement(
+                    &a,
                     collider_a,
-                    &mut trans_a,
-                    &mut vel_a,
+                    trans_a,
+                    vel_a,
                     com_a,
                     i_tensor_a,
+                    &b,
                     collider_b,
-                    &mut trans_b,
-                    &mut vel_b,
+                    trans_b,
+                    vel_b,
                     com_b,
                     i_tensor_b,
-                    pair,
                     config.time,
-                )
-            }
-
-        } {
-            if contact.time_of_impact == 0.0 {
-                manifold_arena.add_contact(contact, &trans_a, com_a, &trans_b, com_b);
-            } else { 
-                // ballistic contact
-                contacts.send(contact);
+                ),
+            } {
+                contact_results.push(contact);        
             }
         }
+         contact_results
+     });
+
+    //for contact in contact_results.iter() {
+    for contact in contact_results.into_iter().flatten() {
+        //info!("Contact: {:?}", contact);
+         if contact.time_of_impact == 0.0 {
+             let [(_a, trans_a, _col_a, _vel_a, com_a, _i_tensor_a), (_b, trans_b, _col_b, _vel_b, com_b, _i_tensor_b)] = query.get_many([contact.a, contact.b]).unwrap();
+             manifold_arena.add_contact(contact, trans_a, com_a, trans_b, com_b);
+         } else {
+             // ballistic contact
+             contacts.send(contact);
+         }
     }
+
+    // let end = Instant::now();
+    // info!("Narrow par: {:?}", end - start);
 }
 
 #[allow(clippy::too_many_arguments)]
 fn conservative_advancement(
     // Shape A
+    a: &Entity,
     shape_a: &Collider,
-    trans_a: &mut Transform,
-    vel_a: &mut Velocity,
+    trans_a: &Transform,
+    vel_a: &Velocity,
     com_a: &CenterOfMass,
     i_tensor_a: &InertiaTensor,
     // Shape B
+    b: &Entity,
     shape_b: &Collider,
-    trans_b: &mut Transform,
-    vel_b: &mut Velocity,    
+    trans_b: &Transform,
+    vel_b: &Velocity,
     com_b: &CenterOfMass,
     i_tensor_b: &InertiaTensor,
-    pair: &BroadContact,
     time: f32,
 ) -> Option<Contact> {
+    let trans_a = &mut trans_a.clone();
+    let vel_a = &mut vel_a.clone();
 
+    let trans_b = &mut trans_b.clone();
+    let vel_b = &mut vel_b.clone();
 
     let mut result = None;
     let mut toi = 0.0;
@@ -165,8 +175,8 @@ fn conservative_advancement(
             world_point_b += normal * BIAS;
 
             result = Some(Contact {
-                a: pair.a,
-                b: pair.b,
+                a: *a,
+                b: *b,
                 world_point_a,
                 world_point_b,
                 local_point_a: RBHelper::world_to_local(trans_a, com_a, world_point_a),
@@ -217,9 +227,7 @@ fn conservative_advancement(
         RBHelper::update(trans_a, vel_a, com_a, i_tensor_a, time_to_go);
         RBHelper::update(trans_b, vel_b, com_b, i_tensor_b, time_to_go);
     }
-    // unwind the clock
-    RBHelper::update(trans_a, vel_a, com_a, i_tensor_a, -toi);
-    RBHelper::update(trans_b, vel_b, com_b, i_tensor_b, -toi);
+
     result
 }
 

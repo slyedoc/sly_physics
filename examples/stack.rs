@@ -49,9 +49,19 @@ pub enum StackMode {
     Cube,
 }
 
+impl std::fmt::Display for StackMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StackMode::Sphere => write!(f, "Sphere"),
+            StackMode::Cube => write!(f, "Cube"),
+        }
+    }
+}
+
+
 impl Default for Stack {
     fn default() -> Self {
-        let size = 8;
+        let size = 10;
         Self {
             count: (size, size, size),
             spacing: 1.1,
@@ -112,7 +122,7 @@ pub fn setup(
                         collider: collider.clone(),
                         ..default()
                     })
-                    .insert(Name::new(format!("Sphere ({}, {}, {})", i, j, k)));
+                    .insert(Name::new(format!("{} ({}, {}, {})", stack.mode, i, j, k)));
             }
         }
     }

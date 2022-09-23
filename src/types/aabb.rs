@@ -1,8 +1,8 @@
 use std::ops::{Add, AddAssign};
 use bevy::prelude::*;
-use bevy_inspector_egui::Inspectable;
 
-#[derive(Component, Debug, Inspectable,  Copy, Clone)]
+#[derive(Component, Debug, Reflect, Copy, Clone)]
+#[reflect(Component)]
 pub struct Aabb {
     pub mins: Vec3,
     pub maxs: Vec3,

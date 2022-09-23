@@ -211,8 +211,6 @@ impl FromWorld for AabbsPipeline {
         // TODO: should be 1 default, but fails, using 4 for now
         let sample_count = world.get_resource::<Msaa>().map(|m| m.samples).unwrap_or(4);
 
-        info!("Sample count: {}", sample_count);
-
         let pipeline_descriptor = RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: ENTITY_AABBS_SHADER.typed(),

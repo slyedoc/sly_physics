@@ -10,7 +10,7 @@ use crate::{
 use super::Constraint;
 
 #[derive(Debug,  Default)]
-pub struct PenetrationArena {
+pub struct ContactArena {
     pub manifolds: HashMap<EntityPair, Manifold>,
 }
 
@@ -43,7 +43,7 @@ impl std::hash::Hash for EntityPair {
     }
 }
 
-impl PenetrationArena {
+impl ContactArena {
     pub fn add_contact(
         &mut self,
         contact: Contact,
@@ -200,7 +200,7 @@ pub fn pre_solve(
         &CenterOfMass,
         &InverseInertiaTensor,
     )>,
-    mut manifold_arena: ResMut<PenetrationArena>,
+    mut manifold_arena: ResMut<ContactArena>,
     config: Res<PhysicsConfig>,
 ) {
     for (pair, manifold) in &mut manifold_arena.manifolds {
@@ -344,7 +344,7 @@ pub fn pre_solve(
 }
 
 pub fn solve(
-    mut manifold_arena: ResMut<PenetrationArena>,
+    mut manifold_arena: ResMut<ContactArena>,
     mut rb_query: Query<(
         &mut Transform,
         &mut Velocity,        
@@ -438,7 +438,7 @@ pub fn solve(
 
 // This cleans up any constraints that are no longer in range
 pub fn post_solve(
-    mut manifold_arena: ResMut<PenetrationArena>,
+    mut manifold_arena: ResMut<ContactArena>,
     rb_query: Query<(&Transform, &CenterOfMass)>,
 ) {
     for (pair, manifold) in &mut manifold_arena.manifolds {

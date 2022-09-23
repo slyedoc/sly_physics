@@ -159,7 +159,7 @@ pub fn broad_phase_bvh(
                 let entity_b = tlas.blas[node_b.blas as usize].entity;
 
                 // if both are not static send broad collision
-                if let Err(_) = static_query.get_many_mut([entity_a, entity_b]) {
+                if static_query.get_many_mut([entity_a, entity_b]).is_err() {
                     broad_contacts.send(BroadContact {
                         a: tlas.blas[node_a.blas as usize].entity,
                         b: tlas.blas[node_b.blas as usize].entity,

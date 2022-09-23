@@ -1,10 +1,10 @@
-#![allow(clippy::too_many_arguments)]
+#![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 mod bvh;
 mod colliders;
 mod constraints;
-mod drag;
 mod debug;
+mod drag;
 mod dynamics;
 mod intersect;
 mod math;
@@ -15,7 +15,7 @@ mod utils;
 use bevy::{math::vec3, prelude::*};
 use bevy_inspector_egui::prelude::*;
 
-use constraints::PenetrationArena;
+use constraints::ContactArena;
 use iyes_loopless::prelude::*;
 use phases::*;
 
@@ -42,12 +42,13 @@ const BOUNDS_EPS: f32 = 0.01;
 
 pub mod prelude {
     pub use crate::{
-        bvh::Ray, bvh::Tlas, colliders::*, constraints::PenetrationArena, debug::BvhCamera,
-        debug::DebugBvhCameraPlugin, debug::PhysicsDebugPlugin, debug::PhysicsDebugState, debug::DebugEntityAabbPlugin,
-        dynamics::*, types::Aabb, types::RBHelper, types::CenterOfMass, types::Elasticity,
-        types::Friction, types::InertiaTensor, types::Velocity, types::Mass, types::InverseMass, types::InverseInertiaTensor,
-        types::RigidBody, PhysicsConfig, PhysicsFixedUpdate, PhysicsPlugin, PhysicsState,
-        PhysicsSystems, RigidBodyBundle, PHYSICS_TIMESTEP,
+        bvh::Ray, bvh::Tlas, colliders::*, constraints::ContactArena, debug::BvhCamera,
+        debug::DebugBvhCameraPlugin, debug::DebugEntityAabbPlugin, debug::PhysicsDebugPlugin,
+        debug::PhysicsDebugState, dynamics::*, types::Aabb, types::CenterOfMass, types::Elasticity,
+        types::Friction, types::InertiaTensor, types::InverseInertiaTensor, types::InverseMass,
+        types::Mass, types::RBHelper, types::RigidBody, types::Velocity, PhysicsConfig,
+        PhysicsFixedUpdate, PhysicsPlugin, PhysicsState, PhysicsSystems, RigidBodyBundle,
+        PHYSICS_TIMESTEP,
     };
 }
 
@@ -123,7 +124,7 @@ impl Plugin for PhysicsPlugin {
             .add_event::<BroadContact>()
             .add_event::<Contact>()
             .init_resource::<PhysicsConfig>()
-            .init_resource::<PenetrationArena>()
+            .init_resource::<ContactArena>()
             .init_resource::<Tlas>()
             .add_stage_after(
                 CoreStage::Update,
@@ -147,22 +148,22 @@ impl Plugin for PhysicsPlugin {
                     .with_system(update_aabb)
                     .into(),
             )
-            .add_system_set_to_stage(
-                PhysicsFixedUpdate,
-                ConditionSet::new()
-                    .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::UpdateTlas)
-                    .after(PhysicsSystems::Update)
-                    .with_system(update_tlas)
-                    .into(),
-            )
+            // .add_system_set_to_stage(
+            //     PhysicsFixedUpdate,
+            //     ConditionSet::new()
+            //         .run_in_state(PhysicsState::Running)
+            //         //.label(PhysicsSystems::UpdateTlas)
+            //         .after(PhysicsSystems::Update)
+            //         .with_system(update_tlas)
+            //         .into(),
+            // )
             // phases
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
                     .label(PhysicsSystems::Broad)
-                    .after(PhysicsSystems::UpdateTlas)
+                    .after(PhysicsSystems::Update)
                     .with_system(broad_phase)
                     //.with_system(broad_phase_bvh)
                     .into(),
@@ -183,7 +184,7 @@ impl Plugin for PhysicsPlugin {
                     .run_in_state(PhysicsState::Running)
                     .label(PhysicsSystems::ConstraintPreSolve)
                     .after(PhysicsSystems::Narrow)
-                    .with_system(constraints::penetration_manifold::pre_solve)
+                    .with_system(constraints::contact_arena::pre_solve)
                     .with_system(constraints::distance::pre_solve)
                     .into(),
             );
@@ -210,7 +211,7 @@ impl Plugin for PhysicsPlugin {
                         4 => PhysicsSystems::ConstraintSolve3,
                         _ => unreachable!(),
                     })
-                    .with_system(constraints::penetration_manifold::solve)
+                    .with_system(constraints::contact_arena::solve)
                     .with_system(constraints::distance::solve)
                     .into(),
             );
@@ -229,7 +230,7 @@ impl Plugin for PhysicsPlugin {
                     5 => PhysicsSystems::ConstraintSolve4,
                     _ => unreachable!(),
                 })
-                .with_system(constraints::penetration_manifold::post_solve)
+                .with_system(constraints::contact_arena::post_solve)
                 .with_system(constraints::distance::post_solve)
                 .into(),
         )
@@ -252,28 +253,17 @@ impl Plugin for PhysicsPlugin {
                 .into(),
         );
 
-        app.register_type::<Velocity>();
-        // registry.register::<RigidBodyMode>();
-        // registry.register::<LinearVelocity>();
-        // registry.register::<Static>();
-        // registry.register::<AngularVelocity>();
-        // registry.register::<Elasticity>();
-        // registry.register::<Friction>();
-        // registry.register::<Mass>();
-        // registry.register::<InverseMass>();
-        // registry.register::<CenterOfMass>();
-        // registry.register::<InertiaTensor>();
-        // registry.register::<InverseInertiaTensor>();
-        // registry.register::<Collider>();
-        // registry.register::<Drag>();
-        // registry.register::<Aabb>();
-        // registry.register::<AabbWorld>();
-        // // .register_inspectable::<Bvh>()
-        // // .register_inspectable::<debug::BvhCamera>()
-        // // .register_inspectable::<Tlas>()
-        // // .register_inspectable::<TlasNode>()
-        // //.register_inspectable::<Tri>()
-        // registry.register::<Aabb>();
+        app.register_type::<RigidBody>()
+            .register_type::<Velocity>()
+            .register_type::<Aabb>()
+            .register_type::<Mass>()
+            .register_type::<InverseMass>()
+            .register_type::<Elasticity>()
+            .register_type::<Friction>()
+            .register_type::<CenterOfMass>()
+            .register_type::<Drag>()
+            .register_type::<InertiaTensor>()
+            .register_type::<InverseInertiaTensor>();
 
         #[cfg(feature = "step")]
         app.add_system_set_to_stage(
@@ -287,7 +277,6 @@ impl Plugin for PhysicsPlugin {
         );
     }
 }
-
 
 // Note: Assuming meshes are loaded
 #[allow(clippy::type_complexity)]
@@ -357,20 +346,24 @@ pub fn update_aabb(
 ) {
     for (trans, mut aabb, col, lin_vel) in query.iter_mut() {
         let collider = colliders.get(col).unwrap();
-        *aabb = collider.get_world_aabb(trans, lin_vel, config.time);         
+        *aabb = collider.get_world_aabb(trans, lin_vel, config.time);
     }
 }
 
-// TODO: both of these update system are incomplete, for now we are rebuilding every frame
-fn update_tlas(query: Query<(Entity, &Handle<Collider>, &Transform, &Aabb)>, mut tlas: ResMut<Tlas>) {
+// TODO: this update system are incomplete, for now rebuilding every frame
+#[allow(dead_code)]
+fn update_tlas(
+    query: Query<(Entity, &Handle<Collider>, &Transform, &Aabb)>,
+    mut tlas: ResMut<Tlas>,
+) {
     // update_bvh_instances;
     tlas.blas.clear();
-    for (entity, col,  trans, aabb) in query.iter() {
-        tlas.blas.push( BvhInstance { 
+    for (entity, col, trans, aabb) in query.iter() {
+        tlas.blas.push(BvhInstance {
             entity,
             collider: col.clone(),
             inv_trans: trans.compute_matrix().inverse(),
-            bounds: *aabb 
+            bounds: *aabb,
         });
     }
 
@@ -406,7 +399,7 @@ fn update_tlas(query: Query<(Entity, &Handle<Collider>, &Transform, &Aabb)>, mut
             let aabb = Aabb {
                 mins: node_a.aabb.mins.min(node_b.aabb.mins),
                 maxs: node_a.aabb.maxs.max(node_b.aabb.maxs),
-            }; 
+            };
             tlas.nodes.push(TlasNode {
                 aabb,
                 left_right: node_index_a + (node_index_b << 16),
@@ -423,8 +416,6 @@ fn update_tlas(query: Query<(Entity, &Handle<Collider>, &Transform, &Aabb)>, mut
     }
     tlas.nodes[0] = tlas.nodes[node_index[a as usize] as usize];
 }
-
-
 
 // TODO: We don't really want to copy the all tris, find better way
 pub fn parse_verts(mesh: &Mesh) -> Vec<Vec3> {

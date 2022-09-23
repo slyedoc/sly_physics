@@ -3,7 +3,7 @@ mod constraint_constant_velocity;
 mod constraint_hinge_quat;
 mod constraint_motor;
 pub mod orientation;
-pub mod penetration_manifold;
+pub mod contact_arena;
 pub mod distance;
 
 use crate::{
@@ -19,7 +19,7 @@ use bevy::prelude::*;
 // use constraint_motor::ConstraintMotor;
 // use constraint_mover::ConstraintMoverSimple;
 pub use orientation::*;
-pub use penetration_manifold::*;
+pub use contact_arena::*;
 
 
 
@@ -43,11 +43,11 @@ impl Constraint {
             inv_mass_matrix.rows[1][1] = inv_mass_a.0;
             inv_mass_matrix.rows[2][2] = inv_mass_a.0;
 
-            let inv_intertia_a = RBHelper::inv_intertia_tensor_world(trans_a, inv_inertia_tensor_a);
+            let inv_inertia_a = RBHelper::inv_inertia_tensor_world(trans_a, inv_inertia_tensor_a);
             for i in 0..3 {
-                inv_mass_matrix.rows[3 + i][3] = inv_intertia_a.col(i)[0];
-                inv_mass_matrix.rows[3 + i][3 + 1] = inv_intertia_a.col(i)[1];
-                inv_mass_matrix.rows[3 + i][3 + 2] = inv_intertia_a.col(i)[2];
+                inv_mass_matrix.rows[3 + i][3] = inv_inertia_a.col(i)[0];
+                inv_mass_matrix.rows[3 + i][3 + 1] = inv_inertia_a.col(i)[1];
+                inv_mass_matrix.rows[3 + i][3 + 2] = inv_inertia_a.col(i)[2];
             }
         }
 
@@ -56,12 +56,12 @@ impl Constraint {
             inv_mass_matrix.rows[7][7] = inv_mass_b.0;
             inv_mass_matrix.rows[8][8] = inv_mass_b.0;
 
-            let inv_intertia_b = RBHelper::inv_intertia_tensor_world(trans_b, inv_inertia_tensor_b);
+            let inv_inertia_b = RBHelper::inv_inertia_tensor_world(trans_b, inv_inertia_tensor_b);
 
             for i in 0..3 {
-                inv_mass_matrix.rows[9 + i][9] = inv_intertia_b.col(i)[0];
-                inv_mass_matrix.rows[9 + i][9 + 1] = inv_intertia_b.col(i)[1];
-                inv_mass_matrix.rows[9 + i][9 + 2] = inv_intertia_b.col(i)[2];
+                inv_mass_matrix.rows[9 + i][9] = inv_inertia_b.col(i)[0];
+                inv_mass_matrix.rows[9 + i][9 + 1] = inv_inertia_b.col(i)[1];
+                inv_mass_matrix.rows[9 + i][9 + 2] = inv_inertia_b.col(i)[2];
             }
         }
 

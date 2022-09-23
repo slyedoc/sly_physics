@@ -106,9 +106,8 @@ impl Collidable for Sphere {
                 return Some(t1);
             } else if t2 >= 0.0 {
                 return Some(t2);
-            } else {
-                return None;
             }
         }
+        None
     }
 }

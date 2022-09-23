@@ -47,7 +47,6 @@ pub fn gjk_does_intersect(
     let mut new_dir = -simplex_points[0].xyz;
 
     loop {
-
         // Get the new point to check on
         let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, 0.0);
 
@@ -92,9 +91,7 @@ pub fn gjk_does_intersect(
         let new_pt = support(collider_a, trans_a, collider_b, trans_b, search_dir, 0.0);
         simplex_points[num_pts] = new_pt;
         num_pts += 1;
-    }
-
-    if num_pts == 2 {
+    } else if num_pts == 2 {
         let ab = simplex_points[1].xyz - simplex_points[0].xyz;
         let u = {
             let n = ab.normalize();
@@ -106,9 +103,7 @@ pub fn gjk_does_intersect(
         let new_pt = support(collider_a, trans_a, collider_b, trans_b, new_dir, 0.0);
         simplex_points[num_pts] = new_pt;
         num_pts += 1;
-    }
-
-    if num_pts == 3 {
+    } else if num_pts == 3 {
         let ab = simplex_points[1].xyz - simplex_points[0].xyz;
         let ac = simplex_points[2].xyz - simplex_points[0].xyz;
         let norm = ab.cross(ac);
@@ -122,11 +117,10 @@ pub fn gjk_does_intersect(
     // Expand the simplex by the bias amount
 
     // Get the center point of the simplex
-    let mut avg = Vec3::ZERO;
-    for simplex_point in &simplex_points {
-        avg += simplex_point.xyz;
-    }
-    avg *= 0.25;
+    let avg = simplex_points
+        .iter()
+        .fold(Vec3::ZERO, |acc, pt| acc + pt.xyz)
+        * 0.25;
 
     // Now expand the simplex by the bias amount
     for pt in &mut simplex_points[0..num_pts] {
@@ -186,7 +180,6 @@ fn epa_expand(
 
     // Expand the simplex to find the closest face of the CSO to the origin
     loop {
-
         let tri = closest_triangle(&triangles, &points).unwrap();
         let normal = normal_direction(&tri, &points);
 
@@ -238,7 +231,11 @@ fn epa_expand(
     }
 
     // Get the projection of the origin on the closest triangle
-    let tri = closest_triangle(&triangles, &points).unwrap();
+    let tri = closest_triangle(&triangles, &points);
+    if tri.is_none() {
+        return None;
+    }
+    let tri = tri.unwrap();
     let pt_a = &points[tri.a as usize];
     let pt_b = &points[tri.b as usize];
     let pt_c = &points[tri.c as usize];
@@ -325,10 +322,10 @@ pub fn gjk_closest_points(
     (pt_on_a, pt_on_b)
 }
 
-fn support<T: Collidable, K: Collidable>(
-    collider_a: &T,
+fn support(
+    collider_a: &Collider,
     trans_a: &Transform,
-    collider_b: &K,
+    collider_b: &Collider,
     trans_b: &Transform,
     dir: Vec3,
     bias: f32,

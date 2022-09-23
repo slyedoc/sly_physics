@@ -22,7 +22,7 @@ use bytemuck::{cast_slice, Pod, Zeroable};
 use iyes_loopless::state::CurrentState;
 
 use super::PhysicsDebugState;
-use crate::prelude::PenetrationArena;
+use crate::prelude::ContactArena;
 
 const CONTACTS_SHADER: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 12103330032048703586);
@@ -47,20 +47,17 @@ impl Plugin for DebugContactsPlugin {
     }
 }
 
-
-struct ContactMesh {
-    mesh: Mesh
-}
+#[derive(Deref)]
+struct ContactMesh(pub Mesh);
 
 impl Default for ContactMesh {
     fn default() -> Self {
-        Self { 
-            mesh: Mesh::from(shape::UVSphere {
+        Self( 
+            Mesh::from(shape::UVSphere {
                 radius: 0.1,
-                sectors: 5,
-                stacks: 5,
+                ..default()
             })
-        }
+        )
     }
 }
 
@@ -205,15 +202,8 @@ struct ContactsMeta {
 
 impl FromWorld for ContactsMeta {
     fn from_world(world: &mut World) -> Self {
-        // Setup our mesh for contacts
 
-        let mesh = &world.resource::<ContactMesh>().mesh;
-
-        let indices = mesh.indices().unwrap();
-        
-        println!("indices: {:?}", indices.iter().count());
-        
-
+        let mesh = &world.resource::<ContactMesh>();
         let render_device = world.resource::<RenderDevice>();
 
         let vertex_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
@@ -250,7 +240,7 @@ impl FromWorld for ContactsMeta {
 
 fn extract_contacts(
     current_state: Extract<Res<CurrentState<PhysicsDebugState>>>,
-    contact_manifold: Extract<Res<PenetrationArena>>,
+    contact_manifold: Extract<Res<ContactArena>>,
     mut contacts: ResMut<Contacts>,
 ) {
 

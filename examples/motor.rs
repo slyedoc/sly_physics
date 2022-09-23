@@ -32,9 +32,8 @@ pub fn setup(
     mut colliders: ResMut<Assets<Collider>>,
     asset_server: Res<AssetServer>,
 ) {
-    error!("This example fails, using it to track down an error!");
 
-    let box_a = colliders.add(Collider::from(Box::new(Vec3::ONE)));
+    let box_collider = colliders.add(Collider::from(Box::new(Vec3::ONE)));
     let box_mesh = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
     let box_mat = materials.add(StandardMaterial {
         base_color_texture: Some(asset_server.load("checker_red.png")),
@@ -54,7 +53,7 @@ pub fn setup(
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
-            collider: box_a.clone(),
+            collider: box_collider.clone(),
             mass: Mass(1.0),
             ..default()
         });
@@ -71,7 +70,7 @@ pub fn setup(
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
-            collider: box_a,
+            collider: box_collider,
             mass: Mass(1.0),
             ..default()
         });
