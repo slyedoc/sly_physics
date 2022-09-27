@@ -2,12 +2,13 @@ mod bvh_camera;
 mod entity_aabb;
 mod bvh_aabb;
 mod contacts;
+mod constraints;
 
 pub use bvh_camera::*;
 pub use entity_aabb::*;
 pub use bvh_aabb::*;
 pub use contacts::*;
-
+pub use constraints::*;
 
 
 use bevy::{prelude::*, math::vec3};
@@ -54,7 +55,8 @@ impl Plugin for PhysicsDebugPlugin {
             // but these work and all are far faster than what i was doing, creating meshes for each every frame
             .add_plugin(DebugEntityAabbPlugin) // draw call per entity with dynamic uniform
             .add_plugin(DebugBvhAabbPlugin)   // expanded index buffer, one draw call
-            .add_plugin(DebugContactsPlugin);   // draw_indexed instanced, one draw call
+            .add_plugin(DebugContactsPlugin) // draw_indexed instanced, one draw call
+            .add_plugin(DebugConstraintsPlugin); // draw_indexed instanced,
         
             // raycast test plugin 
             //.add_plugin(PhysicsBvhCameraPlugin);

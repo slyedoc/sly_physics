@@ -159,7 +159,7 @@ fn resolve_contact(
     // Calculate the friction impulse
     let friction = friction_a.0 * friction_b.0;
 
-    // Find the normal direction of the velocity with respoect to the normal of the collison
+    // Find the normal direction of the velocity with respect to the normal of the collision
     let velocity_normal = contact.normal * contact.normal.dot(vab);
 
     // find the tangent direction of the velocity with respect to the normal of the collision
@@ -172,11 +172,11 @@ fn resolve_contact(
     let inertia_b = (inv_inertia_world_b * rb.cross(relative_velocity_tangent)).cross(rb);
     let inv_inertia = (inertia_a + inertia_b).dot(relative_velocity_tangent);
 
-    // calculat the tangential impluse for friction
+    // calculate the tangential impluse for friction
     let reduced_mass = 1.0 / (total_inv_mass + inv_inertia);
     let impluse_friction = velocity_tangent * (reduced_mass * friction);
 
-    // TODO: Book didnt have this if check, but I was getitng velocity_tangent of zero leading to
+    // TODO: Book didn't have this if check, but I was getting velocity_tangent of zero leading to
     // a Vec3 Nan when normalized if perfectly lined up on ground
     if !impluse_friction.is_nan() {
         // apply kinetic friction

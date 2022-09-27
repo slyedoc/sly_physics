@@ -4,7 +4,7 @@ use iyes_loopless::prelude::*;
 
 use crate::{
     InverseMass, Mass, PhysicsConfig, PhysicsFixedUpdate, PhysicsState,
-    PhysicsSystems, Static, types::Velocity,
+    PhysicsSystem, Static, types::Velocity,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
@@ -24,7 +24,9 @@ impl Plugin for GravityPlugin {
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
                     .run_in_state(GravityState::Running)
-                    .label(PhysicsSystems::Setup)
+                    .label(PhysicsSystem::Dynamics)
+                    .after(PhysicsSystem::Update)
+                    .before(PhysicsSystem::Broad)
                     .with_system(gravity_system)
                     .into(),
             );
@@ -39,8 +41,11 @@ impl Default for Gravity {
     }
 }
 
+#[derive(Component)]
+pub struct NoGravity;
+
 pub fn gravity_system(
-    mut query: Query<(&mut Velocity, &Mass, &InverseMass), Without<Static>>,
+    mut query: Query<(&mut Velocity, &Mass, &InverseMass), (Without<Static>, Without<NoGravity>)>,
     gravity: Res<Gravity>,
     config: Res<PhysicsConfig>,
 ) {
@@ -48,8 +53,8 @@ pub fn gravity_system(
         // since rb is not static, inv mass should be greater than 0
         debug_assert!(inv_mass.0 > 0.0);
 
-        // Apply Gravity, it needs to be an impluse
-        let gravey_impluse = gravity.0 * mass.0 * config.time;
-        velocity.linear += gravey_impluse * inv_mass.0;
+        // Apply Gravity, it needs to be an impulse
+        let impulse = gravity.0 * mass.0 * config.time;
+        velocity.linear += impulse * inv_mass.0;
     }
 }

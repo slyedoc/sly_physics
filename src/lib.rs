@@ -4,7 +4,6 @@ mod bvh;
 mod colliders;
 mod constraints;
 mod debug;
-mod drag;
 mod dynamics;
 mod intersect;
 mod math;
@@ -15,18 +14,18 @@ mod utils;
 use bevy::{math::vec3, prelude::*};
 use bevy_inspector_egui::prelude::*;
 
-use constraints::ContactArena;
 use iyes_loopless::prelude::*;
 use phases::*;
 
 use bvh::*;
 use colliders::*;
+use prelude::PhysicsConstraintsPlugin;
 use types::*;
 
 pub const PHYSICS_TIMESTEP: f64 = 1.0 / 60.0;
 
 const MAX_MANIFOLD_CONTACTS: usize = 4;
-const MAX_SOLVE_ITERS: u32 = 5; // TODO: only valid 1-5
+const MAX_SOLVE_ITERS: u32 = 5; // TOsDO: only valid 1-5
 
 const BVH_BIN_COUNT: usize = 8;
 
@@ -42,12 +41,12 @@ const BOUNDS_EPS: f32 = 0.01;
 
 pub mod prelude {
     pub use crate::{
-        bvh::Ray, bvh::Tlas, colliders::*, constraints::ContactArena, debug::BvhCamera,
+        bvh::Ray, bvh::Tlas, colliders::*, constraints::*, debug::BvhCamera,
         debug::DebugBvhCameraPlugin, debug::DebugEntityAabbPlugin, debug::PhysicsDebugPlugin,
         debug::PhysicsDebugState, dynamics::*, types::Aabb, types::CenterOfMass, types::Elasticity,
         types::Friction, types::InertiaTensor, types::InverseInertiaTensor, types::InverseMass,
         types::Mass, types::RBHelper, types::RigidBody, types::Velocity, PhysicsConfig,
-        PhysicsFixedUpdate, PhysicsPlugin, PhysicsState, PhysicsSystems, RigidBodyBundle,
+        PhysicsFixedUpdate, PhysicsPlugin, PhysicsState, PhysicsSystem, RigidBodyBundle,
         PHYSICS_TIMESTEP,
     };
 }
@@ -62,7 +61,6 @@ pub struct RigidBodyBundle {
     pub friction: Friction,
     pub center_of_mass: CenterOfMass,
     pub inertia_tensor: InertiaTensor,
-    pub damping: Drag,
     pub aabb: Aabb,
     pub inverse_inertia_tensor: InverseInertiaTensor,
     // Will be added
@@ -91,7 +89,7 @@ impl Default for PhysicsConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemLabel)]
-pub enum PhysicsSystems {
+pub enum PhysicsSystem {
     Setup,
     SetupConvex,
     Update,
@@ -99,13 +97,7 @@ pub enum PhysicsSystems {
     Dynamics,
     Broad,
     Narrow,
-    ConstraintPreSolve,
-    ConstraintSolve0,
-    ConstraintSolve1,
-    ConstraintSolve2,
-    ConstraintSolve3,
-    ConstraintSolve4,
-    ConstraintPostSolve,
+    Constraints,
     Drag,
     Resolve,
     Camera,
@@ -120,22 +112,23 @@ pub struct PhysicsPlugin;
 impl Plugin for PhysicsPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(PhysicsState::Running)
+        .add_stage_after(
+            CoreStage::PostUpdate,
+            PhysicsFixedUpdate,
+            SystemStage::parallel(),
+        )
+            .add_plugin(PhysicsConstraintsPlugin)
             .add_asset::<Collider>()
             .add_event::<BroadContact>()
             .add_event::<Contact>()
             .init_resource::<PhysicsConfig>()
-            .init_resource::<ContactArena>()
             .init_resource::<Tlas>()
-            .add_stage_after(
-                CoreStage::Update,
-                PhysicsFixedUpdate,
-                SystemStage::parallel(),
-            )
+
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::Setup)
+                    .label(PhysicsSystem::Setup)
                     .with_system(spawn)
                     .into(),
             )
@@ -143,27 +136,20 @@ impl Plugin for PhysicsPlugin {
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::Update)
-                    .after(PhysicsSystems::Setup)
+                    .label(PhysicsSystem::Update)
+                    .after(PhysicsSystem::Setup)
                     .with_system(update_aabb)
                     .into(),
             )
-            // .add_system_set_to_stage(
-            //     PhysicsFixedUpdate,
-            //     ConditionSet::new()
-            //         .run_in_state(PhysicsState::Running)
-            //         //.label(PhysicsSystems::UpdateTlas)
-            //         .after(PhysicsSystems::Update)
-            //         .with_system(update_tlas)
-            //         .into(),
-            // )
+
             // phases
+            // Dynamic Plugins add systems here
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::Broad)
-                    .after(PhysicsSystems::Update)
+                    .label(PhysicsSystem::Broad)
+                    .after(PhysicsSystem::Update)
                     .with_system(broad_phase)
                     //.with_system(broad_phase_bvh)
                     .into(),
@@ -172,83 +158,19 @@ impl Plugin for PhysicsPlugin {
                 PhysicsFixedUpdate,
                 ConditionSet::new()
                     .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::Narrow)
-                    .after(PhysicsSystems::Broad)
+                    .label(PhysicsSystem::Narrow)
+                    .after(PhysicsSystem::Broad)
                     .with_system(narrow_phase)
                     .into(),
             )
-            // Constraints
-            .add_system_set_to_stage(
-                PhysicsFixedUpdate,
-                ConditionSet::new()
-                    .run_in_state(PhysicsState::Running)
-                    .label(PhysicsSystems::ConstraintPreSolve)
-                    .after(PhysicsSystems::Narrow)
-                    .with_system(constraints::contact_arena::pre_solve)
-                    .with_system(constraints::distance::pre_solve)
-                    .into(),
-            );
+            // Constraints Plugin adds systems here
 
-        // TODO: find better way to reuse systems
-        for i in 0..MAX_SOLVE_ITERS {
-            app.add_system_set_to_stage(
-                PhysicsFixedUpdate,
-                ConditionSet::new()
-                    .run_in_state(PhysicsState::Running)
-                    .label(match i {
-                        0 => PhysicsSystems::ConstraintSolve0,
-                        1 => PhysicsSystems::ConstraintSolve1,
-                        2 => PhysicsSystems::ConstraintSolve2,
-                        3 => PhysicsSystems::ConstraintSolve3,
-                        4 => PhysicsSystems::ConstraintSolve4,
-                        _ => unreachable!(),
-                    })
-                    .after(match i {
-                        0 => PhysicsSystems::ConstraintPreSolve,
-                        1 => PhysicsSystems::ConstraintSolve0,
-                        2 => PhysicsSystems::ConstraintSolve1,
-                        3 => PhysicsSystems::ConstraintSolve2,
-                        4 => PhysicsSystems::ConstraintSolve3,
-                        _ => unreachable!(),
-                    })
-                    .with_system(constraints::contact_arena::solve)
-                    .with_system(constraints::distance::solve)
-                    .into(),
-            );
-        }
-        app.add_system_set_to_stage(
-            PhysicsFixedUpdate,
-            ConditionSet::new()
-                .run_in_state(PhysicsState::Running)
-                .label(PhysicsSystems::ConstraintPostSolve)
-                .after(match MAX_SOLVE_ITERS {
-                    0 => unreachable!(),
-                    1 => PhysicsSystems::ConstraintSolve0,
-                    2 => PhysicsSystems::ConstraintSolve1,
-                    3 => PhysicsSystems::ConstraintSolve2,
-                    4 => PhysicsSystems::ConstraintSolve3,
-                    5 => PhysicsSystems::ConstraintSolve4,
-                    _ => unreachable!(),
-                })
-                .with_system(constraints::contact_arena::post_solve)
-                .with_system(constraints::distance::post_solve)
-                .into(),
-        )
         .add_system_set_to_stage(
             PhysicsFixedUpdate,
             ConditionSet::new()
                 .run_in_state(PhysicsState::Running)
-                .label(PhysicsSystems::Drag)
-                .after(PhysicsSystems::ConstraintPostSolve)
-                .with_system(drag::drag_system)
-                .into(),
-        )
-        .add_system_set_to_stage(
-            PhysicsFixedUpdate,
-            ConditionSet::new()
-                .run_in_state(PhysicsState::Running)
-                .label(PhysicsSystems::Resolve)
-                .after(PhysicsSystems::Drag)
+                .label(PhysicsSystem::Resolve)
+                .after(PhysicsSystem::Broad)
                 .with_system(resolve_phase)
                 .into(),
         );
@@ -261,7 +183,7 @@ impl Plugin for PhysicsPlugin {
             .register_type::<Elasticity>()
             .register_type::<Friction>()
             .register_type::<CenterOfMass>()
-            .register_type::<Drag>()
+            
             .register_type::<InertiaTensor>()
             .register_type::<InverseInertiaTensor>();
 
@@ -270,8 +192,8 @@ impl Plugin for PhysicsPlugin {
             PhysicsFixedUpdate,
             ConditionSet::new()
                 .run_in_state(PhysicsState::Running)
-                .label(PhysicsSystems::Step)
-                .after(PhysicsSystems::Resolve)
+                .label(PhysicsSystem::Step)
+                .after(PhysicsSystem::Resolve)
                 .with_system(stop_step)
                 .into(),
         );
@@ -340,7 +262,7 @@ fn stop_step(mut commands: Commands) {
 }
 
 pub fn update_aabb(
-    mut query: Query<(&Transform, &mut Aabb, &Handle<Collider>, &Velocity)>,
+    mut query: Query<(&GlobalTransform, &mut Aabb, &Handle<Collider>, &Velocity)>,
     config: Res<PhysicsConfig>,
     colliders: Res<Assets<Collider>>,
 ) {

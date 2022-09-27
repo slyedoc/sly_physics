@@ -9,7 +9,7 @@ use crate::{
 
 use super::Constraint;
 
-#[derive(Debug,  Default)]
+#[derive(Debug, Default)]
 pub struct ContactArena {
     pub manifolds: HashMap<EntityPair, Manifold>,
 }
@@ -54,7 +54,7 @@ impl ContactArena {
     ) {
         let pair = EntityPair::new(contact.a, contact.b);
 
-        if let Some(m) = self.manifolds.get_mut( &pair) {
+        if let Some(m) = self.manifolds.get_mut(&pair) {
             m.add_contact(trans_a, com_a, trans_b, com_b, contact);
         } else {
             let mut m = Manifold::default();
@@ -71,14 +71,14 @@ impl ContactArena {
 #[derive(Debug)]
 pub struct Manifold {
     pub contacts: Vec<Contact>,
-    pub constraints: Vec<ConstraintPenetration>,
+    pub constraints: Vec<ContactConstraint>,
 }
 
 impl Default for Manifold {
     fn default() -> Self {
         Self {
             contacts: Vec::<Contact>::with_capacity(MAX_MANIFOLD_CONTACTS),
-            constraints: Vec::<ConstraintPenetration>::with_capacity(MAX_MANIFOLD_CONTACTS),
+            constraints: Vec::<ContactConstraint>::with_capacity(MAX_MANIFOLD_CONTACTS),
         }
     }
 }
@@ -133,7 +133,7 @@ impl Manifold {
                     new_idx = Some(i);
                 }
             }
-            if let Some(idx) = new_idx {                
+            if let Some(idx) = new_idx {
                 self.contacts[idx] = contact;
                 idx
             } else {
@@ -146,7 +146,7 @@ impl Manifold {
 
         let normal = (trans_a.rotation.inverse() * -contact.normal).normalize();
         let constraint =
-            ConstraintPenetration::new(contact.local_point_a, contact.local_point_b, normal);
+            ContactConstraint::new(contact.local_point_a, contact.local_point_b, normal);
         if index < self.constraints.len() {
             self.constraints[index] = constraint;
         } else {
@@ -156,7 +156,7 @@ impl Manifold {
 }
 
 #[derive(Inspectable, Copy, Clone, Debug, Default)]
-pub struct ConstraintPenetration {
+pub struct ContactConstraint {
     pub anchor_a: Vec3, // the anchor location in body_a's space
     pub anchor_b: Vec3, // the anchor location in body_b's space
 
@@ -169,7 +169,7 @@ pub struct ConstraintPenetration {
     pub friction: f32,
 }
 
-impl ConstraintPenetration {
+impl ContactConstraint {
     pub fn new(local_point_a: Vec3, local_point_b: Vec3, normal: Vec3) -> Self {
         Self {
             anchor_a: local_point_a,
@@ -192,21 +192,13 @@ impl ConstraintPenetration {
 }
 
 pub fn pre_solve(
-    mut rb_query: Query<(
-        &mut Transform,
-        &mut Velocity,        
-        &InverseMass,
-        &Friction,
-        &CenterOfMass,
-        &InverseInertiaTensor,
-    )>,
+    mut rb_query: Query<(&mut Transform, &Friction, &CenterOfMass)>,
     mut manifold_arena: ResMut<ContactArena>,
     config: Res<PhysicsConfig>,
 ) {
     for (pair, manifold) in &mut manifold_arena.manifolds {
-        if let Ok(
-            [(trans_a, mut vel_a, inv_mass_a, frict_a, com_a, inv_inert_t_a), (trans_b, mut vel_b, inv_mass_b, frict_b, com_b, inv_inert_t_b)],
-        ) = rb_query.get_many_mut([pair.a, pair.b])
+        if let Ok([(trans_a, frict_a, com_a), (trans_b, frict_b, com_b)]) =
+            rb_query.get_many_mut([pair.a, pair.b])
         {
             for constraint in manifold.constraints.iter_mut() {
                 // get the world space position of the hinge from body_a's orientation
@@ -313,19 +305,6 @@ pub fn pre_solve(
                     }
                 }
 
-                // apply warm starting from last frame
-                let impulses = constraint.jacobian.transpose() * constraint.cached_lambda;
-                Constraint::apply_impulses(
-                    &trans_a,
-                    &mut vel_a,
-                    inv_mass_a,
-                    inv_inert_t_a,
-                    &trans_b,
-                    &mut vel_b,
-                    inv_mass_b,
-                    inv_inert_t_b,
-                    impulses,
-                );
                 // calculate the baumgarte stabilization
                 let mut c = (world_anchor_b - world_anchor_a).dot(normal);
                 c = f32::min(0.0, c + 0.02); // add slop
@@ -333,7 +312,7 @@ pub fn pre_solve(
                 constraint.baumgarte = beta * c / config.time;
             }
         } else {
-            // enties dont exist, so remove contacts so it get cleared
+            // entities don't exist, so remove contacts so it get cleared
             manifold.contacts.clear();
         }
     }
@@ -347,91 +326,83 @@ pub fn solve(
     mut manifold_arena: ResMut<ContactArena>,
     mut rb_query: Query<(
         &mut Transform,
-        &mut Velocity,        
+        &mut Velocity,
         &InverseMass,
         &InverseInertiaTensor,
     )>,
 ) {
     for (pair, manifold) in &mut manifold_arena.manifolds {
-        let [(
-            trans_a,
-            mut vel_a,
-            inv_mass_a,
-           
-            inv_inertia_tensor_a,
-        ), (
-            trans_b,
-            mut vel_b,
-            inv_mass_b,
-            inv_inertia_tensor_b,
-        )] = rb_query.many_mut([pair.a, pair.b]);
+        if let Ok(
+            [(trans_a, mut vel_a, inv_mass_a, inv_inertia_tensor_a), (trans_b, mut vel_b, inv_mass_b, inv_inertia_tensor_b)],
+        ) = rb_query.get_many_mut([pair.a, pair.b])
+        {
+            for constraint in manifold.constraints.iter_mut() {
+                let jacobian_transpose = constraint.jacobian.transpose();
 
-        for constraint in manifold.constraints.iter_mut() {
-            let jacobian_transpose = constraint.jacobian.transpose();
+                // build the system of equations
+                let q_dt = Constraint::get_velocities(&vel_a, &vel_b);
+                let inv_mass_matrix = Constraint::get_inverse_mass_matrix(
+                    &trans_a,
+                    inv_mass_a,
+                    inv_inertia_tensor_a,
+                    &trans_b,
+                    inv_mass_b,
+                    inv_inertia_tensor_b,
+                );
+                let j_w_jt = constraint.jacobian * inv_mass_matrix * jacobian_transpose;
+                let mut rhs = constraint.jacobian * q_dt * -1.0;
+                rhs[0] -= constraint.baumgarte;
 
-            // build the system of equations
-            let q_dt = Constraint::get_velocities(&vel_a, &vel_b);
-            let inv_mass_matrix = Constraint::get_inverse_mass_matrix(
-                &trans_a,
-                inv_mass_a,
-                inv_inertia_tensor_a,
-                &trans_b,
-                inv_mass_b,
-                inv_inertia_tensor_b,
-            );
-            let j_w_jt = constraint.jacobian * inv_mass_matrix * jacobian_transpose;
-            let mut rhs = constraint.jacobian * q_dt * -1.0;
-            rhs[0] -= constraint.baumgarte;
+                // solve for the Lagrange multipliers
+                let mut lambda_n = lcp_gauss_seidel(&MatN::from(j_w_jt), &rhs);
 
-            // solve for the Lagrange multipliers
-            let mut lambda_n = lcp_gauss_seidel(&MatN::from(j_w_jt), &rhs);
+                // accumulate the impulses and clamp within the constraint limits
+                let old_lambda = constraint.cached_lambda;
+                constraint.cached_lambda += lambda_n;
+                let lambda_limit = 0.0;
+                if constraint.cached_lambda[0] < lambda_limit {
+                    constraint.cached_lambda[0] = lambda_limit;
+                }
 
-            // accumulate the impulses and clamp within the constraint limits
-            let old_lambda = constraint.cached_lambda;
-            constraint.cached_lambda += lambda_n;
-            let lambda_limit = 0.0;
-            if constraint.cached_lambda[0] < lambda_limit {
-                constraint.cached_lambda[0] = lambda_limit;
+                if constraint.friction > 0.0 {
+                    let umg = constraint.friction * 10.0 * 1.0 / (inv_mass_a.0 + inv_mass_b.0);
+                    let normal_force = (lambda_n[0] * constraint.friction).abs();
+                    let max_force = if umg > normal_force {
+                        umg
+                    } else {
+                        normal_force
+                    };
+
+                    if constraint.cached_lambda[1] > max_force {
+                        constraint.cached_lambda[1] = max_force;
+                    }
+                    if constraint.cached_lambda[1] < -max_force {
+                        constraint.cached_lambda[1] = -max_force;
+                    }
+
+                    if constraint.cached_lambda[2] > max_force {
+                        constraint.cached_lambda[2] = max_force;
+                    }
+                    if constraint.cached_lambda[2] < -max_force {
+                        constraint.cached_lambda[2] = -max_force;
+                    }
+                }
+                lambda_n = constraint.cached_lambda - old_lambda;
+
+                // apply the impulses
+                let impulses = jacobian_transpose * lambda_n;
+                Constraint::apply_impulses(
+                    &trans_a,
+                    &mut vel_a,
+                    inv_mass_a,
+                    inv_inertia_tensor_a,
+                    &trans_b,
+                    &mut vel_b,
+                    inv_mass_b,
+                    inv_inertia_tensor_b,
+                    impulses,
+                );
             }
-
-            if constraint.friction > 0.0 {
-                let umg = constraint.friction * 10.0 * 1.0 / (inv_mass_a.0 + inv_mass_b.0);
-                let normal_force = (lambda_n[0] * constraint.friction).abs();
-                let max_force = if umg > normal_force {
-                    umg
-                } else {
-                    normal_force
-                };
-
-                if constraint.cached_lambda[1] > max_force {
-                    constraint.cached_lambda[1] = max_force;
-                }
-                if constraint.cached_lambda[1] < -max_force {
-                    constraint.cached_lambda[1] = -max_force;
-                }
-
-                if constraint.cached_lambda[2] > max_force {
-                    constraint.cached_lambda[2] = max_force;
-                }
-                if constraint.cached_lambda[2] < -max_force {
-                    constraint.cached_lambda[2] = -max_force;
-                }
-            }
-            lambda_n = constraint.cached_lambda - old_lambda;
-
-            // apply the impulses
-            let impulses = jacobian_transpose * lambda_n;
-            Constraint::apply_impulses(
-                &trans_a,
-                &mut vel_a,
-                inv_mass_a,
-                inv_inertia_tensor_a,
-                &trans_b,
-                &mut vel_b,
-                inv_mass_b,
-                inv_inertia_tensor_b,
-                impulses,
-            );
         }
     }
 }

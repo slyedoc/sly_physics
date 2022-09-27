@@ -12,7 +12,7 @@ impl Plugin for PickingPlugin {
             .add_startup_system(setup_cursor)
             .add_system_to_stage(
                 PhysicsFixedUpdate,
-                cursor_system.after(PhysicsSystems::Resolve),
+                cursor_system.after(PhysicsSystem::Resolve),
             );
     }
 }

@@ -1,4 +1,6 @@
-mod overlay;
+mod assets;
+mod text_overlay;
+mod interaction_menu_overlay;
 mod picking;
 
 use std::f32::consts::FRAC_PI_2;
@@ -8,16 +10,21 @@ use iyes_loopless::prelude::*;
 use sly_camera_controller::{CameraController, CameraControllerPlugin};
 use sly_physics::prelude::*;
 
-use overlay::OverlayPlugin;
+use text_overlay::TextOverlayPlugin;
+use interaction_menu_overlay::InteractionMenuOverlayPlugin;
 use picking::PickingPlugin;
+use assets::*;
 
 pub struct HelperPlugin;
 
 impl Plugin for HelperPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(AppState::Playing)
+            .init_resource::<FontAssets>()
+            .init_resource::<ButtonColors>()
             .add_plugin(CameraControllerPlugin)
-            .add_plugin(OverlayPlugin)
+            .add_plugin(TextOverlayPlugin)
+            //.add_plugin(InteractionMenuOverlayPlugin)
             .add_plugin(PickingPlugin)
             .add_system_to_stage( CoreStage::Update, reset_listen.run_in_state(AppState::Playing))
             .add_enter_system(AppState::Reset, reset)
@@ -25,6 +32,7 @@ impl Plugin for HelperPlugin {
             .add_system(toggle_physics_debug);
     }
 }
+
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub enum AppState {
@@ -47,10 +55,10 @@ pub fn setup_camera(mut commands: Commands) {
         
     commands
         .spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 2.0, -30.0).looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(0.0, 2.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         })
-        .insert(BvhCamera::new(512, 512))
+        .insert(BvhCamera::new(256,256))
         // Add our controller
         .insert(CameraController::default())
         .insert(Keep);
@@ -147,7 +155,7 @@ pub struct Keep;
 
 pub fn reset(
     mut commands: Commands,
-    query: Query<Entity, Without<Keep>>,
+    query: Query<Entity, (Without<Keep>, Without<Parent>)>,
 ) {
     for e in query.iter() {
         commands.entity(e).despawn();

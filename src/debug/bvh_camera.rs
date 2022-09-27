@@ -1,5 +1,5 @@
 use crate::{
-    prelude::Collider, utils::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystems, Ray,
+    prelude::Collider, utils::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystem, Ray,
     Tlas,
 };
 use bevy::{
@@ -23,14 +23,14 @@ impl Plugin for DebugBvhCameraPlugin {
                 PhysicsFixedUpdate,
                 update_camera_debug_colors
                     .run_in_state(PhysicsDebugState::Running)
-                    .before(PhysicsSystems::Resolve),
+                    .before(PhysicsSystem::Resolve),
             )
             .add_system_to_stage(
                 PhysicsFixedUpdate,
                 render_image
                     .run_in_state(PhysicsDebugState::Running)
-                    .label(PhysicsSystems::Camera)
-                    .after(PhysicsSystems::Resolve),
+                    .label(PhysicsSystem::Camera)
+                    .after(PhysicsSystem::Resolve),
             )
             .add_exit_system(PhysicsDebugState::Running, remove_ui);
     }

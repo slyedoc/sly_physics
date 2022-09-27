@@ -296,11 +296,10 @@ impl Collidable for Convex {
         self.bounds
     }
 
-    fn get_world_aabb(&self, trans: &Transform, velocity: &Velocity, time: f32) -> Aabb {
+    fn get_world_aabb(&self, trans: &GlobalTransform, velocity: &Velocity, time: f32) -> Aabb {
         let mut aabb = Aabb::default();
         for pt in &self.verts {
-            let pt = (trans.rotation * *pt) + trans.translation;
-            aabb.expand_by_point(pt);
+            aabb.expand_by_point(trans.mul_vec3(*pt));
         }
         // expand by the linear velocity
         let p1 = aabb.mins + velocity.linear * time;

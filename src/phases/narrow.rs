@@ -41,7 +41,7 @@ pub fn narrow_phase(
                 (a, trans_a, col_a, vel_a, com_a, i_tensor_a),
                 (b, trans_b, col_b, vel_b, com_b, i_tensor_b),
             ] = query.get_many([broad_contact.a, broad_contact.b]).unwrap();
-
+            
             let collider_a = colliders.get(col_a).unwrap();
             let collider_b = colliders.get(col_b).unwrap();
 

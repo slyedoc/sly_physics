@@ -52,13 +52,14 @@ impl Collidable for Sphere {
 
     fn get_world_aabb(
         &self,
-        trans: &Transform,
+        trans: &GlobalTransform,
         velocity: &Velocity,
         time: f32,
     ) -> Aabb {
+        let translation = trans.translation();
         let mut aabb = Aabb {
-            mins: trans.translation - self.radius,
-            maxs: trans.translation + self.radius,
+            mins: translation - self.radius,
+            maxs: translation + self.radius,
         };
 
         // expand by the linear velocity

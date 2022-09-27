@@ -5,11 +5,12 @@ use bevy::{
 use iyes_loopless::prelude::*;
 use sly_physics::prelude::*;
 
-use super::Keep;
+use super::{Keep, FontAssets};
 
-pub struct OverlayPlugin;
 
-impl Plugin for OverlayPlugin {
+pub struct TextOverlayPlugin;
+
+impl Plugin for TextOverlayPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(FrameTimeDiagnosticsPlugin::default())
             .add_startup_system(setup_overlay)
@@ -33,8 +34,7 @@ struct DebugStateText;
 
 pub const UI_SIZE: f32 = 30.0;
 
-fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
-    let ui_font = asset_server.load("fonts/FiraSans-Bold.ttf");
+fn setup_overlay(mut commands: Commands, fonts: ResMut<FontAssets>) {
 
     let mut offset = 10.0;
     let offset_change = 25.0;
@@ -51,14 +51,12 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
                 align_self: AlignSelf::FlexEnd,
                 ..Default::default()
             },
-            // Use `Text` directly
             text: Text {
-                // Construct a `Vec` of `TextSection`s
                 sections: vec![
                     TextSection {
                         value: "FPS: ".to_string(),
                         style: TextStyle {
-                            font: ui_font.clone(),
+                            font: fonts.ui_font.clone(),
                             font_size: UI_SIZE,
                             color: Color::WHITE,
                         },
@@ -66,7 +64,7 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
                     TextSection {
                         value: "".to_string(),
                         style: TextStyle {
-                            font: ui_font.clone(),
+                            font: fonts.ui_font.clone(),
                             font_size: UI_SIZE,
                             color: Color::GOLD,
                         },
@@ -95,14 +93,12 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
                 align_self: AlignSelf::FlexEnd,
                 ..Default::default()
             },
-            // Use `Text` directly
             text: Text {
-                // Construct a `Vec` of `TextSection`s
                 sections: vec![
                     TextSection {
                         value: "State: ".to_string(),
                         style: TextStyle {
-                            font: ui_font.clone(),
+                            font: fonts.ui_font.clone(),
                             font_size: UI_SIZE,
                             color: Color::WHITE,
                         },
@@ -110,7 +106,7 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
                     TextSection {
                         value: "".to_string(),
                         style: TextStyle {
-                            font: ui_font.clone(),
+                            font: fonts.ui_font.clone(),
                             font_size: UI_SIZE,
                             color: Color::GOLD,
                         },
@@ -139,14 +135,12 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
                 align_self: AlignSelf::FlexEnd,
                 ..Default::default()
             },
-            // Use `Text` directly
             text: Text {
-                // Construct a `Vec` of `TextSection`s
                 sections: vec![
                     TextSection {
                         value: "Debug: ".to_string(),
                         style: TextStyle {
-                            font: ui_font.clone(),
+                            font: fonts.ui_font.clone(),
                             font_size: UI_SIZE,
                             color: Color::WHITE,
                         },
@@ -154,7 +148,7 @@ fn setup_overlay(mut commands: Commands, asset_server: ResMut<AssetServer>) {
                     TextSection {
                         value: "".to_string(),
                         style: TextStyle {
-                            font: ui_font.clone(),
+                            font: fonts.ui_font.clone(),
                             font_size: UI_SIZE,
                             color: Color::GOLD,
                         },
@@ -186,7 +180,6 @@ fn update_fps(diagnostics: Res<Diagnostics>, mut query: Query<&mut Text, With<Fp
     }
 }
 
-
 fn update_state(state: Res<CurrentState<PhysicsState>>, mut query: Query<&mut Text, With<PhysicsStateText>>) {
     for mut text in query.iter_mut() {
         text.sections[1].value = format!("{:?}", state.0);
@@ -197,8 +190,8 @@ fn update_state(state: Res<CurrentState<PhysicsState>>, mut query: Query<&mut Te
     }
 }
 
-
 fn update_debug(state: Res<CurrentState<PhysicsDebugState>>, mut query: Query<&mut Text, With<DebugStateText>>) {
+
     for mut text in query.iter_mut() {
         text.sections[1].value =  match state.0 {
             PhysicsDebugState::Running => "Enabled".to_string(),

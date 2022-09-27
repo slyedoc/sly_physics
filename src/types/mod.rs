@@ -216,19 +216,7 @@ pub struct CenterOfMass(pub Vec3);
 #[reflect(Component)]
 pub struct InertiaTensor(pub Mat3);
 
-#[derive(Component, Reflect, Debug)]
-#[reflect(Component)]
-pub struct Drag {
-    pub linear_velocity: f32,
-}
 
-impl Default for Drag {
-    fn default() -> Drag {
-        Drag {
-            linear_velocity: 0.01,
-        }
-    }
-}
 
 #[derive(Component, Reflect, Debug, Default)]
 #[reflect(Component)]

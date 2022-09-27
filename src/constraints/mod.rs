@@ -1,27 +1,141 @@
 #![allow(dead_code)]
 mod constraint_constant_velocity;
-mod constraint_hinge_quat;
-mod constraint_motor;
-pub mod orientation;
-pub mod contact_arena;
-pub mod distance;
+mod contact_constraint;
+mod distance_constraint;
+mod hinge_quat_constraint;
+mod hinge_quat_limited_constraint;
+mod motor_constraint;
+mod orientation_constraint;
 
 use crate::{
     math::{MatMN, VecN},
-    InverseInertiaTensor,
-    InverseMass, RBHelper, prelude::Velocity
+    prelude::Velocity,
+    InverseInertiaTensor, InverseMass, PhysicsFixedUpdate, PhysicsState,
+    PhysicsSystem, RBHelper, MAX_SOLVE_ITERS,
 };
 use bevy::prelude::*;
 
+use iyes_loopless::prelude::*;
 // use constraint_constant_velocity::ConstraintConstantVelocityLimited;
 // use constraint_distance::ConstraintDistance;
 // use constraint_hinge_quat::ConstraintHingeQuatLimited;
-// use constraint_motor::ConstraintMotor;
+
 // use constraint_mover::ConstraintMoverSimple;
-pub use orientation::*;
-pub use contact_arena::*;
+pub use contact_constraint::*;
+pub use distance_constraint::*;
+pub use hinge_quat_constraint::*;
+pub use motor_constraint::*;
+pub use orientation_constraint::*;
+pub use hinge_quat_limited_constraint::*;
 
+pub struct PhysicsConstraintsPlugin;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemLabel)]
+pub enum ConstraintSystem {
+    ConstraintPreSolve,
+    ConstraintSolve0,
+    ConstraintSolve1,
+    ConstraintSolve2,
+    ConstraintSolve3,
+    ConstraintSolve4,
+    ConstraintPostSolve,
+}
+
+impl Plugin for PhysicsConstraintsPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<ContactArena>().add_system_set_to_stage(
+            PhysicsFixedUpdate,
+            ConditionSet::new()
+                .run_in_state(PhysicsState::Running)
+                .label(ConstraintSystem::ConstraintPreSolve)
+                .after(PhysicsSystem::Narrow)
+                .with_system(contact_constraint::pre_solve)
+                .with_system(orientation_constraint::pre_solve)
+                .with_system(distance_constraint::pre_solve)
+                .with_system(motor_constraint::pre_solve)
+                .with_system(hinge_quat_constraint::pre_solve)
+                .with_system(hinge_quat_limited_constraint::pre_solve)
+                .into(),
+        );
+
+        // TODO: find better way to reuse systems
+        for i in 0..MAX_SOLVE_ITERS {
+            let labels = constraint_labels(i);
+            app.add_system_set_to_stage(
+                PhysicsFixedUpdate,
+                ConditionSet::new()
+                    .run_in_state(PhysicsState::Running)
+                    .label(labels.0)
+                    .after(labels.1)
+                    .with_system(contact_constraint::solve)
+                    .with_system(distance_constraint::solve)
+                    .with_system(orientation_constraint::solve)
+                    .with_system(motor_constraint::solve)
+                    .with_system(hinge_quat_constraint::solve)
+                    .with_system(hinge_quat_limited_constraint::solve)
+                    .into(),
+            );
+        }
+        app.add_system_set_to_stage(
+            PhysicsFixedUpdate,
+            ConditionSet::new()
+                .run_in_state(PhysicsState::Running)
+                .label(ConstraintSystem::ConstraintPostSolve)
+                .after(constraint_post_solve_label())
+                .before(PhysicsSystem::Resolve)
+                .with_system(contact_constraint::post_solve)
+                .with_system(distance_constraint::post_solve)
+                .with_system(hinge_quat_constraint::post_solve)
+                .with_system(hinge_quat_limited_constraint::post_solve)
+                .into(),
+        )
+        .register_type::<MotorConstraint>()
+        .register_type::<OrientationConstraint>()
+        .register_type::<HingeQuatConstraint>()
+        .register_type::<HingeQuatLimitedConstraint>();
+    }
+}
+
+fn constraint_labels(i: u32) -> (ConstraintSystem, ConstraintSystem) {
+    (
+        match i {
+            0 => ConstraintSystem::ConstraintSolve0,
+            1 => ConstraintSystem::ConstraintSolve1,
+            2 => ConstraintSystem::ConstraintSolve2,
+            3 => ConstraintSystem::ConstraintSolve3,
+            4 => ConstraintSystem::ConstraintSolve4,
+            _ => unreachable!(),
+        },
+        match i {
+            0 => ConstraintSystem::ConstraintPreSolve,
+            1 => ConstraintSystem::ConstraintSolve0,
+            2 => ConstraintSystem::ConstraintSolve1,
+            3 => ConstraintSystem::ConstraintSolve2,
+            4 => ConstraintSystem::ConstraintSolve3,
+            _ => unreachable!(),
+        },
+    )
+}
+
+fn constraint_post_solve_label() -> ConstraintSystem {
+    match MAX_SOLVE_ITERS {
+        0 => unreachable!(),
+        1 => ConstraintSystem::ConstraintSolve0,
+        2 => ConstraintSystem::ConstraintSolve1,
+        3 => ConstraintSystem::ConstraintSolve2,
+        4 => ConstraintSystem::ConstraintSolve3,
+        5 => ConstraintSystem::ConstraintSolve4,
+        _ => unreachable!(),
+    }
+}
+
+// TODO: make this a trait
+pub trait Constrainable {
+
+    fn get_parent(&self) -> Option<Entity>;
+    fn get_anchor(&self) -> Vec3;
+    fn get_parent_anchor(&self) -> Vec3;
+}
 
 pub struct Constraint;
 
@@ -68,11 +182,7 @@ impl Constraint {
         inv_mass_matrix
     }
 
-    pub fn get_velocities(
-        vel_a: &Velocity,
-        
-        vel_b: &Velocity,
-    ) -> VecN<12> {
+    pub fn get_velocities(vel_a: &Velocity, vel_b: &Velocity) -> VecN<12> {
         let mut q_dt = VecN::zero();
 
         q_dt[0] = vel_a.linear.x;
@@ -87,7 +197,7 @@ impl Constraint {
         q_dt[7] = vel_b.linear.y;
         q_dt[8] = vel_b.linear.z;
 
-        q_dt[9] =  vel_b.angular.x;
+        q_dt[9] = vel_b.angular.x;
         q_dt[10] = vel_b.angular.y;
         q_dt[11] = vel_b.angular.z;
 
@@ -98,7 +208,7 @@ impl Constraint {
     pub fn apply_impulses(
         // A
         trans_a: &Transform,
-        vel_a: &mut Velocity,        
+        vel_a: &mut Velocity,
         inv_mass_a: &InverseMass,
         inv_inertia_tensor_a: &InverseInertiaTensor,
         // B
