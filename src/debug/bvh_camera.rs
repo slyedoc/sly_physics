@@ -140,8 +140,6 @@ impl BvhCamera {
     }
 }
 
-
-
 pub fn render_image(
     mut commands: Commands,
     mut camera_query: Query<(&mut BvhCamera, &Transform)>,

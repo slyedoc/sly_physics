@@ -1,13 +1,13 @@
+mod ray;
 mod tlas;
 mod tri;
-mod ray;
 
+pub use ray::*;
 pub use tlas::*;
 pub use tri::*;
-pub use ray::*;
 
-use crate::{types::Aabb, prelude::Collider};
-use bevy::{ prelude::*};
+use crate::{prelude::Collider, types::Aabb};
+use bevy::prelude::*;
 
 #[derive(Default, Debug)]
 pub struct BvhNode {

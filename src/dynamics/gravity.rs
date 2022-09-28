@@ -3,8 +3,8 @@ use bevy_inspector_egui::Inspectable;
 use iyes_loopless::prelude::*;
 
 use crate::{
-    InverseMass, Mass, PhysicsConfig, PhysicsFixedUpdate, PhysicsState,
-    PhysicsSystem, Static, types::Velocity,
+    types::Velocity, InverseMass, Mass, PhysicsConfig, PhysicsFixedUpdate, PhysicsState,
+    PhysicsSystem, Static,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]

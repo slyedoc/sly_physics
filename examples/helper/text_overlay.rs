@@ -5,8 +5,7 @@ use bevy::{
 use iyes_loopless::prelude::*;
 use sly_physics::prelude::*;
 
-use super::{Keep, FontAssets};
-
+use super::{FontAssets, Keep};
 
 pub struct TextOverlayPlugin;
 
@@ -35,7 +34,6 @@ struct DebugStateText;
 pub const UI_SIZE: f32 = 30.0;
 
 fn setup_overlay(mut commands: Commands, fonts: ResMut<FontAssets>) {
-
     let mut offset = 10.0;
     let offset_change = 25.0;
 
@@ -78,10 +76,9 @@ fn setup_overlay(mut commands: Commands, fonts: ResMut<FontAssets>) {
         .insert(Keep)
         .insert(FpsText);
 
-        offset += offset_change;
+    offset += offset_change;
 
-
-        commands
+    commands
         .spawn_bundle(TextBundle {
             style: Style {
                 position_type: PositionType::Absolute,
@@ -120,10 +117,9 @@ fn setup_overlay(mut commands: Commands, fonts: ResMut<FontAssets>) {
         .insert(Keep)
         .insert(PhysicsStateText);
 
-        offset += offset_change;
+    offset += offset_change;
 
-
-        commands
+    commands
         .spawn_bundle(TextBundle {
             style: Style {
                 position_type: PositionType::Absolute,
@@ -180,26 +176,31 @@ fn update_fps(diagnostics: Res<Diagnostics>, mut query: Query<&mut Text, With<Fp
     }
 }
 
-fn update_state(state: Res<CurrentState<PhysicsState>>, mut query: Query<&mut Text, With<PhysicsStateText>>) {
+fn update_state(
+    state: Res<CurrentState<PhysicsState>>,
+    mut query: Query<&mut Text, With<PhysicsStateText>>,
+) {
     for mut text in query.iter_mut() {
         text.sections[1].value = format!("{:?}", state.0);
         text.sections[1].style.color = match state.0 {
             PhysicsState::Running => Color::GREEN,
-            PhysicsState::Paused => Color::RED,                        
+            PhysicsState::Paused => Color::RED,
         };
     }
 }
 
-fn update_debug(state: Res<CurrentState<PhysicsDebugState>>, mut query: Query<&mut Text, With<DebugStateText>>) {
-
+fn update_debug(
+    state: Res<CurrentState<PhysicsDebugState>>,
+    mut query: Query<&mut Text, With<DebugStateText>>,
+) {
     for mut text in query.iter_mut() {
-        text.sections[1].value =  match state.0 {
+        text.sections[1].value = match state.0 {
             PhysicsDebugState::Running => "Enabled".to_string(),
             PhysicsDebugState::Paused => "Disabled".to_string(),
         };
         text.sections[1].style.color = match state.0 {
             PhysicsDebugState::Running => Color::GREEN,
-            PhysicsDebugState::Paused => Color::RED,                        
+            PhysicsDebugState::Paused => Color::RED,
         };
     }
 }

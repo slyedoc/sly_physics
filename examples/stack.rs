@@ -8,7 +8,7 @@ mod helper;
 fn main() {
     App::new()
         .insert_resource(WindowDescriptor {
-            present_mode: PresentMode::AutoVsync,
+            present_mode: PresentMode::AutoNoVsync,
             ..default()
         })
         .add_plugins(DefaultPlugins)
@@ -20,7 +20,6 @@ fn main() {
         .add_plugin(DebugBvhCameraPlugin)
         // local setup stuff
         .add_plugin(HelperPlugin)
-
         .add_plugin(InspectorPlugin::<Stack>::new())
         .add_startup_system(helper::setup_camera)
         .add_enter_system(AppState::Playing, helper::setup_room)
@@ -57,7 +56,6 @@ impl std::fmt::Display for StackMode {
         }
     }
 }
-
 
 impl Default for Stack {
     fn default() -> Self {
@@ -161,7 +159,6 @@ pub fn setup(
     let diamond = make_diamond_convex_shape();
     let diamond_convex_collider = Convex::new(&diamond);
     let diamond_mesh = diamond_convex_collider.mesh.clone();
-
 
     commands
         .spawn_bundle(PbrBundle {

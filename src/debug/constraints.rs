@@ -48,9 +48,15 @@ impl Plugin for DebugConstraintsPlugin {
                 .init_resource::<GpuLines>()
                 .add_render_command::<Transparent3d, DrawConstraints>()
                 .add_system_to_stage(RenderStage::Extract, extract_anchors::<MotorConstraint>)
-                .add_system_to_stage(RenderStage::Extract, extract_anchors::<OrientationConstraint>)
+                .add_system_to_stage(
+                    RenderStage::Extract,
+                    extract_anchors::<OrientationConstraint>,
+                )
                 .add_system_to_stage(RenderStage::Extract, extract_anchors::<HingeQuatConstraint>)
-                .add_system_to_stage(RenderStage::Extract, extract_anchors::<HingeQuatLimitedConstraint>)
+                .add_system_to_stage(
+                    RenderStage::Extract,
+                    extract_anchors::<HingeQuatLimitedConstraint>,
+                )
                 .add_system_to_stage(RenderStage::Extract, extract_anchors::<DistanceConstraint>)
                 .add_system_to_stage(RenderStage::Prepare, prepare_constraints)
                 .add_system_to_stage(RenderStage::Queue, queue_constraints)
@@ -227,7 +233,7 @@ impl FromWorld for ConstraintMeta {
         let index_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
             usage: BufferUsages::INDEX,
             label: Some("constraint_line_index_buffer"),
-            contents: &meshes.line_mesh.get_index_buffer_bytes().unwrap(),
+            contents: meshes.line_mesh.get_index_buffer_bytes().unwrap(),
         });
 
         let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
@@ -259,15 +265,16 @@ fn extract_anchors<T: Component + Constrainable>(
             .iter()
             .filter(|(_e, c)| c.get_parent().is_some())
         {
-            if let Ok([trans_a, trans_b]) = rb_query.get_many([e, constraint.get_parent().unwrap()]) {
+            if let Ok([trans_a, trans_b]) = rb_query.get_many([e, constraint.get_parent().unwrap()])
+            {
                 gpu_lines.lines.push(Line {
                     start: trans_a.translation,
-                    end: trans_a.translation + (trans_a.rotation * constraint.get_anchor()),
+                    end: trans_a.translation + (trans_a.rotation * constraint.get_anchor_a()),
                 });
 
                 gpu_lines.lines.push(Line {
                     start: trans_b.translation,
-                    end: trans_b.translation + (trans_b.rotation * constraint.get_parent_anchor()),
+                    end: trans_b.translation + (trans_b.rotation * constraint.get_anchor_b()),
                 });
             }
         }

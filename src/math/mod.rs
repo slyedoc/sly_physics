@@ -1,7 +1,6 @@
-
 mod glam_ext;
-mod matrix;
 mod lcp;
+mod matrix;
 mod vector;
 
 pub use glam_ext::*;

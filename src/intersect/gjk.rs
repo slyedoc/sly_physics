@@ -231,11 +231,7 @@ fn epa_expand(
     }
 
     // Get the projection of the origin on the closest triangle
-    let tri = closest_triangle(&triangles, &points);
-    if tri.is_none() {
-        return None;
-    }
-    let tri = tri.unwrap();
+    let tri = closest_triangle(&triangles, &points)?;
     let pt_a = &points[tri.a as usize];
     let pt_b = &points[tri.b as usize];
     let pt_c = &points[tri.c as usize];

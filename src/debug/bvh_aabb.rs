@@ -282,7 +282,7 @@ impl FromWorld for BvhAabbsPipeline {
             },
             depth_stencil: Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
-                depth_compare: CompareFunction::Greater,
+                depth_compare: CompareFunction::Always,
                 stencil: StencilState {
                     front: StencilFaceState::IGNORE,
                     back: StencilFaceState::IGNORE,
@@ -321,7 +321,6 @@ type DrawBvhAabb = (
     SetBvhAabbBindGroup<1>,
     DrawBvhAabbInstance,
 );
-
 
 struct SetBvhAabbPipeline;
 impl<P: PhaseItem> RenderCommand<P> for SetBvhAabbPipeline {

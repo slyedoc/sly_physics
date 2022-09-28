@@ -1,7 +1,7 @@
-mod sphere;
 mod gjk;
+mod sphere;
 
 // use bevy::prelude::*;
 
-pub use sphere::*;
 pub use gjk::*;
+pub use sphere::*;

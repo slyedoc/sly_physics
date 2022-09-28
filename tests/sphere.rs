@@ -1,7 +1,4 @@
-use bevy::{
-    math::{vec3},
-    prelude::*,
-};
+use bevy::{math::vec3, prelude::*};
 use sly_physics::prelude::*;
 
 #[test]
@@ -35,15 +32,17 @@ fn did_sphere_fall() {
     // Check resulting changes
     assert!(app.world.get::<Transform>(id).is_some());
 
-    info!("Translation {:?}", app.world.get::<Transform>(id).unwrap().translation);
-    assert_eq!(app.world.get::<Transform>(id).unwrap().translation, vec3(0.0, 0.0, 0.0));
+    info!(
+        "Translation {:?}",
+        app.world.get::<Transform>(id).unwrap().translation
+    );
+    assert_eq!(
+        app.world.get::<Transform>(id).unwrap().translation,
+        vec3(0.0, 0.0, 0.0)
+    );
 }
 
-fn spawn_ground(
-    mut commands: Commands,
-    mut colliders: ResMut<Assets<Collider>>,
-) {
-
+fn spawn_ground(mut commands: Commands, mut colliders: ResMut<Assets<Collider>>) {
     commands
         .spawn_bundle(SpatialBundle {
             transform: Transform::from_translation(Vec3::ZERO),

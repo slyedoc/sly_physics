@@ -1,17 +1,16 @@
-mod bvh_camera;
-mod entity_aabb;
 mod bvh_aabb;
-mod contacts;
+mod bvh_camera;
 mod constraints;
+mod contacts;
+mod entity_aabb;
 
-pub use bvh_camera::*;
-pub use entity_aabb::*;
 pub use bvh_aabb::*;
-pub use contacts::*;
+pub use bvh_camera::*;
 pub use constraints::*;
+pub use contacts::*;
+pub use entity_aabb::*;
 
-
-use bevy::{prelude::*, math::vec3};
+use bevy::{math::vec3, prelude::*};
 use iyes_loopless::prelude::*;
 
 #[derive(Component)]
@@ -46,21 +45,17 @@ const AABB_INDICES_LEN: u32 = AABB_INDICES.len() as u32;
 pub struct PhysicsDebugPlugin;
 impl Plugin for PhysicsDebugPlugin {
     fn build(&self, app: &mut App) {
-
-        app
-            .add_loopless_state(PhysicsDebugState::Paused)
+        app.add_loopless_state(PhysicsDebugState::Paused)
             // Rendering debug systems
             // TODO: These are some of the first pipelines I have made, and all 3 use different techniques
             // as I was learning, should most likely switch them to draw_indexed instanced
             // but these work and all are far faster than what i was doing, creating meshes for each every frame
             .add_plugin(DebugEntityAabbPlugin) // draw call per entity with dynamic uniform
-            .add_plugin(DebugBvhAabbPlugin)   // expanded index buffer, one draw call
+            .add_plugin(DebugBvhAabbPlugin) // expanded index buffer, one draw call
             .add_plugin(DebugContactsPlugin) // draw_indexed instanced, one draw call
             .add_plugin(DebugConstraintsPlugin); // draw_indexed instanced,
-        
-            // raycast test plugin 
-            //.add_plugin(PhysicsBvhCameraPlugin);
+
+        // raycast test plugin
+        //.add_plugin(PhysicsBvhCameraPlugin);
     }
 }
-
-

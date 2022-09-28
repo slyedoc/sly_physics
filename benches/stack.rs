@@ -24,10 +24,7 @@ fn stack_benchmark(c: &mut Criterion) {
                     // our plugins
                     .add_plugin(PhysicsPlugin)
                     .add_plugin(GravityPlugin)
-                    .insert_resource(StackConfig {
-                        size,
-                        item,
-                    })
+                    .insert_resource(StackConfig { size, item })
                     // setup environment
                     .add_startup_system(spawn_camera)
                     .add_startup_system(spawn_room)
@@ -76,7 +73,6 @@ impl std::fmt::Display for StackItem {
         }
     }
 }
-
 
 struct StackConfig {
     size: usize,
@@ -191,7 +187,11 @@ pub fn spawn_room(
                 ..default()
             })
             .insert_bundle(RigidBodyBundle {
-                collider: colliders.add(Collider::from(Box::new(vec3(floor_size, wall_height, 1.0)))),
+                collider: colliders.add(Collider::from(Box::new(vec3(
+                    floor_size,
+                    wall_height,
+                    1.0,
+                )))),
                 mode: RigidBody::Static,
                 ..default()
             })

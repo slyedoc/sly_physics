@@ -1,5 +1,4 @@
-
-use crate::{types::*, BOUNDS_EPS, prelude::Ray};
+use crate::{prelude::Ray, types::*, BOUNDS_EPS};
 use bevy::{math::vec3, prelude::*};
 
 use super::Collidable;
@@ -50,12 +49,7 @@ impl Collidable for Sphere {
         self.aabb
     }
 
-    fn get_world_aabb(
-        &self,
-        trans: &GlobalTransform,
-        velocity: &Velocity,
-        time: f32,
-    ) -> Aabb {
+    fn get_world_aabb(&self, trans: &GlobalTransform, velocity: &Velocity, time: f32) -> Aabb {
         let translation = trans.translation();
         let mut aabb = Aabb {
             mins: translation - self.radius,
@@ -88,7 +82,6 @@ impl Collidable for Sphere {
 
     // Returns distance at which ray would hit the sphere, or None if it doesn't hit
     fn intersect(&self, ray: &mut Ray) -> Option<f32> {
-
         let sphere_to_ray = ray.origin;
         let a = ray.direction.dot(ray.direction);
         let b = 2.0 * ray.direction.dot(ray.origin);
@@ -102,7 +95,7 @@ impl Collidable for Sphere {
             let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
 
             if t1 >= 0.0 && t2 >= 0.0 {
-                return Some( t1.min(t2));
+                return Some(t1.min(t2));
             } else if t1 >= 0.0 {
                 return Some(t1);
             } else if t2 >= 0.0 {

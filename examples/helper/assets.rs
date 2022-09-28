@@ -14,7 +14,6 @@ impl Default for ButtonColors {
     }
 }
 
-
 pub struct FontAssets {
     pub ui_font: Handle<Font>,
 }
@@ -26,7 +25,6 @@ impl FromWorld for FontAssets {
         Self { ui_font }
     }
 }
-
 
 impl FontAssets {
     #[allow(dead_code)]
@@ -52,7 +50,7 @@ impl FontAssets {
             },
         }
     }
-    
+
     #[allow(dead_code)]
     pub fn sub_title(&self, text: String, color: Color) -> TextSection {
         TextSection {

@@ -6,9 +6,8 @@
 // use bevy::prelude::*;
 
 // #[test]
-// fn test_epa() {    
+// fn test_epa() {
 
-    
 //     let box_a = BoxCollider::new(Vec3::ONE);
 //     let trans_a = Transform {
 //         translation: vec3(8.00000667, 9.4973526, 2.5000124),

@@ -1,5 +1,5 @@
-use std::ops::{Add, AddAssign};
 use bevy::prelude::*;
+use std::ops::{Add, AddAssign};
 
 #[derive(Component, Debug, Reflect, Copy, Clone)]
 #[reflect(Component)]

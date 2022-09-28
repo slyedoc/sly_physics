@@ -1,19 +1,19 @@
 mod assets;
-mod text_overlay;
 mod interaction_menu_overlay;
 mod picking;
+mod text_overlay;
 
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::{prelude::*, math::vec3};
+use bevy::{math::vec3, prelude::*};
 use iyes_loopless::prelude::*;
 use sly_camera_controller::{CameraController, CameraControllerPlugin};
 use sly_physics::prelude::*;
 
 use text_overlay::TextOverlayPlugin;
-use interaction_menu_overlay::InteractionMenuOverlayPlugin;
-use picking::PickingPlugin;
+//use interaction_menu_overlay::InteractionMenuOverlayPlugin;
 use assets::*;
+use picking::PickingPlugin;
 
 pub struct HelperPlugin;
 
@@ -26,13 +26,15 @@ impl Plugin for HelperPlugin {
             .add_plugin(TextOverlayPlugin)
             //.add_plugin(InteractionMenuOverlayPlugin)
             .add_plugin(PickingPlugin)
-            .add_system_to_stage( CoreStage::Update, reset_listen.run_in_state(AppState::Playing))
+            .add_system_to_stage(
+                CoreStage::Update,
+                reset_listen.run_in_state(AppState::Playing),
+            )
             .add_enter_system(AppState::Reset, reset)
             .add_system(toggle_physics)
             .add_system(toggle_physics_debug);
     }
 }
-
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub enum AppState {
@@ -52,18 +54,17 @@ pub fn setup_camera(mut commands: Commands) {
             ..default()
         })
         .insert(Keep);
-        
+
     commands
         .spawn_bundle(Camera3dBundle {
             transform: Transform::from_xyz(0.0, 2.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         })
-        .insert(BvhCamera::new(256,256))
+        .insert(BvhCamera::new(256, 256))
         // Add our controller
         .insert(CameraController::default())
         .insert(Keep);
 }
-
 
 pub fn setup_room(
     mut commands: Commands,
@@ -75,7 +76,7 @@ pub fn setup_room(
     let wall_height = 10.0;
     let floor_half = floor_size * 0.5;
     let wall_height_half = wall_height * 0.5;
-    
+
     // floor
     commands
         .spawn_bundle(PbrBundle {
@@ -113,7 +114,11 @@ pub fn setup_room(
                 ..default()
             })
             .insert_bundle(RigidBodyBundle {
-                collider: colliders.add(Collider::from(Box::new(vec3(floor_size, wall_height, 1.0)))),
+                collider: colliders.add(Collider::from(Box::new(vec3(
+                    floor_size,
+                    wall_height,
+                    1.0,
+                )))),
                 mode: RigidBody::Static,
                 ..default()
             })
@@ -127,7 +132,7 @@ fn toggle_physics(
     state: Res<CurrentState<PhysicsState>>,
 ) {
     if input.just_pressed(KeyCode::Space) {
-        let target = match state.0 {            
+        let target = match state.0 {
             PhysicsState::Running => PhysicsState::Paused,
             PhysicsState::Paused => PhysicsState::Running,
         };
@@ -137,7 +142,7 @@ fn toggle_physics(
 
 fn toggle_physics_debug(
     mut commands: Commands,
-    input: Res<Input<KeyCode>>,    
+    input: Res<Input<KeyCode>>,
     state: Res<CurrentState<PhysicsDebugState>>,
 ) {
     if input.just_pressed(KeyCode::Key1) {
@@ -153,22 +158,15 @@ fn toggle_physics_debug(
 #[derive(Component)]
 pub struct Keep;
 
-pub fn reset(
-    mut commands: Commands,
-    query: Query<Entity, (Without<Keep>, Without<Parent>)>,
-) {
+pub fn reset(mut commands: Commands, query: Query<Entity, (Without<Keep>, Without<Parent>)>) {
     for e in query.iter() {
         commands.entity(e).despawn();
     }
     commands.insert_resource(NextState(AppState::Playing));
 }
 
-pub fn reset_listen(
-    mut commands: Commands,
-    input: Res<Input<KeyCode>>,
-) {
+pub fn reset_listen(mut commands: Commands, input: Res<Input<KeyCode>>) {
     if input.just_pressed(KeyCode::R) {
         commands.insert_resource(NextState(AppState::Reset));
     }
 }
-

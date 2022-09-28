@@ -11,7 +11,7 @@ mod phases;
 mod types;
 mod utils;
 
-use bevy::{math::vec3, prelude::*};
+use bevy::{ecs::query::WorldQuery, math::vec3, prelude::*};
 use bevy_inspector_egui::prelude::*;
 
 use iyes_loopless::prelude::*;
@@ -25,8 +25,7 @@ use types::*;
 pub const PHYSICS_TIMESTEP: f64 = 1.0 / 60.0;
 
 const MAX_MANIFOLD_CONTACTS: usize = 4;
-const MAX_SOLVE_ITERS: u32 = 5; // TOsDO: only valid 1-5
-
+const MAX_SOLVE_ITERS: u32 = 5;
 const BVH_BIN_COUNT: usize = 8;
 
 // 30 rad/s is fast enough for us
@@ -61,12 +60,23 @@ pub struct RigidBodyBundle {
     pub friction: Friction,
     pub center_of_mass: CenterOfMass,
     pub inertia_tensor: InertiaTensor,
-    pub aabb: Aabb,
     pub inverse_inertia_tensor: InverseInertiaTensor,
+    pub aabb: Aabb,
     // Will be added
-    // Static - if mode is static static
 
+    // Static - if mode is static static
     // InverseMass,
+}
+
+#[derive(WorldQuery)]
+#[world_query(mutable, derive(Debug))]
+pub struct RBQuery {
+    entity: Entity,
+    transform: &'static mut Transform,
+    velocity: &'static mut Velocity,
+    inv_mass: &'static InverseMass,
+    inv_inertia_tensor: &'static InverseInertiaTensor,
+    center_of_mass: &'static CenterOfMass,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
@@ -97,7 +107,6 @@ pub enum PhysicsSystem {
     Dynamics,
     Broad,
     Narrow,
-    Constraints,
     Drag,
     Resolve,
     Camera,
@@ -112,18 +121,18 @@ pub struct PhysicsPlugin;
 impl Plugin for PhysicsPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(PhysicsState::Running)
-        .add_stage_after(
-            CoreStage::PostUpdate,
-            PhysicsFixedUpdate,
-            SystemStage::parallel(),
-        )
+            .add_stage_after(
+                CoreStage::PostUpdate,
+                PhysicsFixedUpdate,
+                SystemStage::parallel(),
+            )
             .add_plugin(PhysicsConstraintsPlugin)
             .add_asset::<Collider>()
             .add_event::<BroadContact>()
             .add_event::<Contact>()
+            .add_event::<ManifoldContact>()
             .init_resource::<PhysicsConfig>()
             .init_resource::<Tlas>()
-
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
                 ConditionSet::new()
@@ -141,7 +150,14 @@ impl Plugin for PhysicsPlugin {
                     .with_system(update_aabb)
                     .into(),
             )
-
+            // .add_system_set_to_stage(
+            //     PhysicsFixedUpdate,
+            //     ConditionSet::new()
+            //         .run_in_state(PhysicsState::Running)
+            //         .after(PhysicsSystem::Update)
+            //         .with_system(update_tlas)
+            //         .into(),
+            // )
             // phases
             // Dynamic Plugins add systems here
             .add_system_set_to_stage(
@@ -164,18 +180,16 @@ impl Plugin for PhysicsPlugin {
                     .into(),
             )
             // Constraints Plugin adds systems here
-
-        .add_system_set_to_stage(
-            PhysicsFixedUpdate,
-            ConditionSet::new()
-                .run_in_state(PhysicsState::Running)
-                .label(PhysicsSystem::Resolve)
-                .after(PhysicsSystem::Broad)
-                .with_system(resolve_phase)
-                .into(),
-        );
-
-        app.register_type::<RigidBody>()
+            .add_system_set_to_stage(
+                PhysicsFixedUpdate,
+                ConditionSet::new()
+                    .run_in_state(PhysicsState::Running)
+                    .label(PhysicsSystem::Resolve)
+                    .after(PhysicsSystem::Broad)
+                    .with_system(resolve_phase)
+                    .into(),
+            )
+            .register_type::<RigidBody>()
             .register_type::<Velocity>()
             .register_type::<Aabb>()
             .register_type::<Mass>()
@@ -183,7 +197,6 @@ impl Plugin for PhysicsPlugin {
             .register_type::<Elasticity>()
             .register_type::<Friction>()
             .register_type::<CenterOfMass>()
-            
             .register_type::<InertiaTensor>()
             .register_type::<InverseInertiaTensor>();
 
@@ -359,3 +372,6 @@ pub fn parse_verts(mesh: &Mesh) -> Vec<Vec3> {
         _ => todo!(),
     }
 }
+
+#[test]
+fn test_local_world() {}

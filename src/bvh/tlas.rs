@@ -39,7 +39,6 @@ impl Default for Tlas {
 }
 
 impl Tlas {
-
     pub fn find_best_match(&self, list: &[u32], n: i32, a: i32) -> i32 {
         let mut smallest = f32::MAX;
         let mut best_b = -1i32;

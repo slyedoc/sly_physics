@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{EPSILON_SQ, EPSILON};
+use crate::{EPSILON, EPSILON_SQ};
 
 #[allow(dead_code)]
 pub fn ray_sphere_intersect(
@@ -40,7 +40,7 @@ pub fn sphere_sphere_static(
     let length_squared = ab.length_squared();
     if length_squared < radius_ab * radius_ab {
         let norm = ab.normalize_or_zero();
-        
+
         let pt_on_a = pos_a + norm * radius_a;
         let pt_on_b = pos_b - norm * radius_b;
 
@@ -60,7 +60,6 @@ pub fn sphere_sphere_dynamic(
     linear_velocity_b: Vec3,
     dt: f32,
 ) -> Option<(Vec3, Vec3, f32)> {
-
     let relative_velocity = linear_velocity_a - linear_velocity_b;
     let start_pt_a = pos_a;
     let end_pt_a = pos_a + relative_velocity * dt;
@@ -69,10 +68,9 @@ pub fn sphere_sphere_dynamic(
     let mut t0 = 0.0;
     let mut t1 = 0.0;
 
-
     if ray_dir.length_squared() < EPSILON_SQ {
         // ray is too short, just check if intersecting
-        let ab = pos_b - pos_a;        
+        let ab = pos_b - pos_a;
         let radius = radius_a + radius_b + EPSILON;
         if ab.length_squared() > radius * radius {
             return None;
@@ -105,7 +103,6 @@ pub fn sphere_sphere_dynamic(
     let new_pos_a = pos_a + linear_velocity_a * toi;
     let new_pos_b = pos_b + linear_velocity_b * toi;
     let ab = (new_pos_b - new_pos_a).normalize_or_zero();
-
 
     let pt_on_a = new_pos_a + ab * radius_a;
     let pt_on_b = new_pos_b - ab * radius_b;

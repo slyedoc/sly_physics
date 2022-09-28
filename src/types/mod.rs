@@ -1,6 +1,6 @@
 mod aabb;
-pub use aabb::*;
 use crate::{MAX_ANGULAR_SPEED, MAX_ANGULAR_SPEED_SQ};
+pub use aabb::*;
 
 use bevy::prelude::*;
 #[derive(Debug)]
@@ -22,6 +22,8 @@ pub struct Contact {
     pub time_of_impact: f32,
 }
 
+pub struct ManifoldContact(pub Contact);
+
 pub struct RBHelper;
 
 impl RBHelper {
@@ -34,8 +36,7 @@ impl RBHelper {
 
     #[inline]
     pub fn local_to_world(trans: &Transform, com: &CenterOfMass, local_point: Vec3) -> Vec3 {
-        let com_world = trans.translation + trans.rotation * com.0;
-        com_world + trans.rotation * local_point
+        trans.mul_vec3(com.0 + local_point)
     }
 
     #[inline]
@@ -55,7 +56,7 @@ impl RBHelper {
     #[allow(clippy::too_many_arguments)]
     pub fn apply_impulse(
         trans: &Transform,
-        velocity: &mut Velocity,        
+        velocity: &mut Velocity,
         inv_mass: &InverseMass,
         com: &CenterOfMass,
         inv_inertia_tensor: &InverseInertiaTensor,
@@ -75,11 +76,7 @@ impl RBHelper {
     }
 
     #[inline]
-    pub fn apply_impulse_linear(
-        velocity: &mut Velocity,
-        inv_mass: &InverseMass,
-        impulse: Vec3,
-    ) {
+    pub fn apply_impulse_linear(velocity: &mut Velocity, inv_mass: &InverseMass, impulse: Vec3) {
         if inv_mass.0 == 0.0 {
             return;
         }
@@ -109,11 +106,11 @@ impl RBHelper {
             velocity.angular = velocity.angular.normalize() * MAX_ANGULAR_SPEED;
         }
     }
-    
+
     #[inline]
     pub fn update(
         transform: &mut Transform,
-        velocity: &mut Velocity,        
+        velocity: &mut Velocity,
         com: &CenterOfMass,
         inertia_tensor: &InertiaTensor,
         dt: f32,
@@ -130,8 +127,8 @@ impl RBHelper {
         // a = I^-1 (w x I * w)
         let orientation = Mat3::from_quat(transform.rotation);
         let inertia_tensor = orientation * inertia_tensor.0 * orientation.transpose();
-        let alpha = inertia_tensor.inverse()
-            * (velocity.angular.cross(inertia_tensor * velocity.angular));
+        let alpha =
+            inertia_tensor.inverse() * (velocity.angular.cross(inertia_tensor * velocity.angular));
         velocity.angular += alpha * dt;
 
         // update orientation
@@ -175,7 +172,7 @@ pub struct Velocity {
 /// assumed 0.0..=1.0
 #[derive(Component, Deref, DerefMut, Reflect, Debug)]
 #[reflect(Component)]
-pub struct Elasticity(pub f32); 
+pub struct Elasticity(pub f32);
 
 impl Default for Elasticity {
     fn default() -> Elasticity {
@@ -186,7 +183,7 @@ impl Default for Elasticity {
 /// assumed 0.0..=1.0
 #[derive(Component, Deref, DerefMut, Reflect, Debug)]
 #[reflect(Component)]
-pub struct Friction(pub f32); 
+pub struct Friction(pub f32);
 
 impl Default for Friction {
     fn default() -> Friction {
@@ -208,7 +205,7 @@ impl Default for Mass {
 #[reflect(Component)]
 pub struct InverseMass(pub f32);
 
-#[derive(Component, Deref, DerefMut, Reflect,  Debug, Default)]
+#[derive(Component, Deref, DerefMut, Reflect, Debug, Default)]
 #[reflect(Component)]
 pub struct CenterOfMass(pub Vec3);
 
@@ -216,10 +213,6 @@ pub struct CenterOfMass(pub Vec3);
 #[reflect(Component)]
 pub struct InertiaTensor(pub Mat3);
 
-
-
 #[derive(Component, Reflect, Debug, Default)]
 #[reflect(Component)]
 pub struct InverseInertiaTensor(pub Mat3);
-
-

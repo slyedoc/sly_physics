@@ -1,8 +1,9 @@
 use std::mem::swap;
 
-use crate::{    
+use crate::{
     bvh::{BvhInstance, BvhTri, Tlas, TlasNode},
-    types::Aabb, prelude::{Collider, Collidable}, 
+    prelude::{Collidable, Collider},
+    types::Aabb,
 };
 use bevy::prelude::*;
 
@@ -62,13 +63,9 @@ impl Ray {
     }
 
     // TODO: This is from bevy_mod_raycast, need to do more reading up on ndc
-    pub fn from_camera(
-        camera: &Camera,
-        camera_transform: &Transform,
-        cursor: Vec2,
-    ) -> Self {        
+    pub fn from_camera(camera: &Camera, camera_transform: &Transform, cursor: Vec2) -> Self {
         let screen_size = camera.logical_viewport_size().unwrap();
-        let camera_position = camera_transform.compute_matrix();        
+        let camera_position = camera_transform.compute_matrix();
         let projection_matrix = camera.projection_matrix();
 
         // Normalized device coordinate cursor position from (-1, -1, -1) to (1, 1, 1)
@@ -102,8 +99,8 @@ impl Ray {
         let edge1 = tri.vertex1 - tri.vertex0;
         let edge2 = tri.vertex2 - tri.vertex0;
         let h = self.direction.cross(edge2);
-        let a = edge1.dot(h);  
-        if a.abs() < 0.00001 { 
+        let a = edge1.dot(h);
+        if a.abs() < 0.00001 {
             return None;
         }
 
@@ -128,7 +125,7 @@ impl Ray {
     }
 
     #[inline(always)]
-    pub fn intersect_aabb(&self, aabb: &Aabb ) -> f32 {
+    pub fn intersect_aabb(&self, aabb: &Aabb) -> f32 {
         #[cfg(feature = "trace")]
         let _span = info_span!("intersect_aabb").entered();
         let tx1 = (aabb.mins.x - self.origin.x) * self.direction_inv.x;
@@ -145,7 +142,7 @@ impl Ray {
         t_max = t_max.min(tz1.max(tz2));
 
         // Most intersect test would return here with a t_max and min test
-        // but we are also sorting 
+        // but we are also sorting
         let t_hit = if let Some(hit) = self.hit {
             hit.distance
         } else {
@@ -158,9 +155,12 @@ impl Ray {
             f32::MAX
         }
     }
-   
 
-    pub fn intersect_collider_instance(&mut self, colliders: &Assets<Collider>, bvh_instance: &BvhInstance) {
+    pub fn intersect_collider_instance(
+        &mut self,
+        colliders: &Assets<Collider>,
+        bvh_instance: &BvhInstance,
+    ) {
         #[cfg(feature = "trace")]
         let _span = info_span!("intersect_bvh_instance").entered();
         let collider = colliders.get(&bvh_instance.collider).unwrap();
@@ -197,7 +197,7 @@ impl Ray {
         *self = backup_ray;
     }
 
-    pub fn intersect_tlas(&mut self, tlas: &Tlas, colliders: &Assets<Collider>) -> Option<Hit> {        
+    pub fn intersect_tlas(&mut self, tlas: &Tlas, colliders: &Assets<Collider>) -> Option<Hit> {
         if tlas.nodes.is_empty() || tlas.blas.is_empty() {
             return None;
         }
@@ -205,7 +205,7 @@ impl Ray {
         let mut node = &tlas.nodes[0];
         loop {
             if node.is_leaf() {
-                self.intersect_collider_instance(colliders, &tlas.blas[node.blas as usize] );
+                self.intersect_collider_instance(colliders, &tlas.blas[node.blas as usize]);
                 if stack.is_empty() {
                     break;
                 } else {

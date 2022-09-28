@@ -162,7 +162,8 @@ impl Convex {
             let mut bin = vec![Bin::default(); BVH_BIN_COUNT];
             let mut scale = BVH_BIN_COUNT as f32 / (bounds_max - bounds_min);
             for i in 0..node.tri_count {
-                let triangle = &self.bvh_tris[self.triangle_indexes[(node.left_first + i) as usize]];
+                let triangle =
+                    &self.bvh_tris[self.triangle_indexes[(node.left_first + i) as usize]];
                 let bin_idx =
                     (BVH_BIN_COUNT - 1).min(((triangle.centroid[a] - bounds_min) * scale) as usize);
                 bin[bin_idx].tri_count += 1;
@@ -336,7 +337,7 @@ impl Collidable for Convex {
                         if distance.is_none() || t < distance.unwrap() {
                             distance = Some(t);
                         }
-                    }                        
+                    }
                 }
                 if stack.is_empty() {
                     return distance;

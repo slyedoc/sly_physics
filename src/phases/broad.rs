@@ -172,10 +172,9 @@ pub fn broad_phase_bvh(
                 if !leaf_a {
                     stack.push((node_a.right(), b));
                     stack.push((node_a.left(), b));
-                    
+
                     //children
                     //stack.push((node_a.left(), node_a.right()));
-
                 } else {
                     stack.push((a, node_b.right()));
                     stack.push((a, node_b.left()));

@@ -12,7 +12,7 @@ use bevy::{
     render::{
         render_phase::*,
         render_resource::*,
-        renderer::{RenderDevice},
+        renderer::RenderDevice,
         texture::BevyDefault,
         view::{ViewUniform, ViewUniformOffset, ViewUniforms},
         Extract, RenderApp, RenderStage,
@@ -22,7 +22,7 @@ use bytemuck::{cast_slice, Pod, Zeroable};
 use iyes_loopless::state::CurrentState;
 
 use super::PhysicsDebugState;
-use crate::prelude::ContactArena;
+use crate::prelude::{CenterOfMass, ContactManifolds};
 
 const CONTACTS_SHADER: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 12103330032048703586);
@@ -52,15 +52,12 @@ struct ContactMesh(pub Mesh);
 
 impl Default for ContactMesh {
     fn default() -> Self {
-        Self( 
-            Mesh::from(shape::UVSphere {
-                radius: 0.1,
-                ..default()
-            })
-        )
+        Self(Mesh::from(shape::UVSphere {
+            radius: 0.1,
+            ..default()
+        }))
     }
 }
-
 
 #[derive(Clone, Debug, Default)]
 struct Contacts {
@@ -113,18 +110,17 @@ impl FromWorld for ContactsPipeline {
             VertexFormat::Float32x2,
         ];
 
-        let vertex_layout = VertexBufferLayout::from_vertex_formats(VertexStepMode::Vertex, formats);        
+        let vertex_layout =
+            VertexBufferLayout::from_vertex_formats(VertexStepMode::Vertex, formats);
 
         let instance_vertex_layout = VertexBufferLayout {
-            array_stride: mem::size_of::<[f32;3]>() as u64,
+            array_stride: mem::size_of::<[f32; 3]>() as u64,
             step_mode: VertexStepMode::Instance,
-            attributes: vec![
-                VertexAttribute {
-                    format: VertexFormat::Float32x3,
-                    offset: 0,
-                    shader_location: 3, // shader locations 0-2 are taken up by Position, Normal and UV attributes
-                },
-            ],
+            attributes: vec![VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 0,
+                shader_location: 3, // shader locations 0-2 are taken up by Position, Normal and UV attributes
+            }],
         };
 
         let pipeline_descriptor = RenderPipelineDescriptor {
@@ -132,10 +128,7 @@ impl FromWorld for ContactsPipeline {
                 shader: CONTACTS_SHADER.typed(),
                 entry_point: "vertex".into(),
                 shader_defs: vec![],
-                buffers: vec![
-                    vertex_layout,
-                    instance_vertex_layout
-                ],
+                buffers: vec![vertex_layout, instance_vertex_layout],
             },
             fragment: Some(FragmentState {
                 shader: CONTACTS_SHADER.typed(),
@@ -159,7 +152,7 @@ impl FromWorld for ContactsPipeline {
             },
             depth_stencil: Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
-                depth_compare: CompareFunction::Greater,
+                depth_compare: CompareFunction::Always,
                 stencil: StencilState {
                     front: StencilFaceState::IGNORE,
                     back: StencilFaceState::IGNORE,
@@ -202,7 +195,6 @@ struct ContactsMeta {
 
 impl FromWorld for ContactsMeta {
     fn from_world(world: &mut World) -> Self {
-
         let mesh = &world.resource::<ContactMesh>();
         let render_device = world.resource::<RenderDevice>();
 
@@ -218,15 +210,13 @@ impl FromWorld for ContactsMeta {
             contents: mesh.get_index_buffer_bytes().unwrap(),
         });
 
-        let instance_buffer = render_device.create_buffer_with_data(
-            &BufferInitDescriptor {
-                label: Some("contact_instance_buffer"),
-                contents: &[],
-                usage: BufferUsages::VERTEX,
-            }
-        );
+        let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("contact_instance_buffer"),
+            contents: &[],
+            usage: BufferUsages::VERTEX,
+        });
         let index_count = mesh.indices().unwrap().iter().count() as u32;
-        
+
         Self {
             instances: Vec::new(),
             instance_buffer,
@@ -240,20 +230,24 @@ impl FromWorld for ContactsMeta {
 
 fn extract_contacts(
     current_state: Extract<Res<CurrentState<PhysicsDebugState>>>,
-    contact_manifold: Extract<Res<ContactArena>>,
+    transform_query: Extract<Query<(&Transform, &CenterOfMass)>>,
+    contact_manifold: Extract<Res<ContactManifolds>>,
     mut contacts: ResMut<Contacts>,
 ) {
-
     contacts.data.clear();
     if current_state.0 == PhysicsDebugState::Running {
-        for (_pair, manifold) in &contact_manifold.manifolds {
-            for contact in &manifold.contacts {
-                contacts.data.push(GpuContact {
-                    position: contact.world_point_a,
-                });
-                contacts.data.push(GpuContact {
-                    position: contact.world_point_b,
-                });
+        for (pair, manifold) in &contact_manifold.manifolds {
+            for contact in &manifold.constraints {
+                if let Ok((trans, com)) = transform_query.get(pair.a) {
+                    contacts.data.push(GpuContact {
+                        position: trans.mul_vec3(com.0 + contact.anchor_a),
+                    });
+                }
+                if let Ok((trans, com)) = transform_query.get(pair.b) {
+                    contacts.data.push(GpuContact {
+                        position: trans.mul_vec3(com.0 + contact.anchor_b),
+                    });
+                }
             }
         }
     }
@@ -264,7 +258,6 @@ fn prepare_contacts(
     render_device: Res<RenderDevice>,
     mut contacts_meta: ResMut<ContactsMeta>,
 ) {
-    
     contacts_meta.instances.clear();
     for contact in contacts.data.iter() {
         contacts_meta.instances.push(GpuContact {
@@ -272,14 +265,11 @@ fn prepare_contacts(
         });
     }
 
-
-    contacts_meta.instance_buffer = render_device.create_buffer_with_data(
-        &BufferInitDescriptor {
-            label: Some("contact_instance_buffer"),
-            contents: cast_slice(&contacts_meta.instances),
-            usage: BufferUsages::VERTEX,
-        }
-    );
+    contacts_meta.instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+        label: Some("contact_instance_buffer"),
+        contents: cast_slice(&contacts_meta.instances),
+        usage: BufferUsages::VERTEX,
+    });
 }
 
 fn queue_contacts(
@@ -290,32 +280,27 @@ fn queue_contacts(
     view_uniforms: Res<ViewUniforms>,
     mut views: Query<&mut RenderPhase<Transparent3d>>,
 ) {
+    let draw_aabb_function = draw_functions.read().get_id::<DrawContacts>().unwrap();
 
-        let draw_aabb_function = draw_functions.read().get_id::<DrawContacts>().unwrap();
+    if let Some(view_binding) = view_uniforms.uniforms.binding() {
+        aabb_meta.view_bind_group = Some(render_device.create_bind_group(&BindGroupDescriptor {
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: view_binding,
+            }],
+            label: Some("contact_view_bind_group"),
+            layout: &contacts_pipeline.view_layout,
+        }));
+    }
 
-        if let Some(view_binding) = view_uniforms.uniforms.binding() {
-            aabb_meta.view_bind_group =
-                Some(render_device.create_bind_group(&BindGroupDescriptor {
-                    entries: &[BindGroupEntry {
-                        binding: 0,
-                        resource: view_binding,
-                    }],
-                    label: Some("contact_view_bind_group"),
-                    layout: &contacts_pipeline.view_layout,
-            }));
-
-        }
-
-
-        for mut transparent3d_phase in views.iter_mut() {
-            transparent3d_phase.add(Transparent3d {
-                draw_function: draw_aabb_function,
-                pipeline: contacts_pipeline.pipeline_id,
-                entity: Entity::from_raw(0),
-                distance: 0.0,
-            });
-        }
-    
+    for mut transparent3d_phase in views.iter_mut() {
+        transparent3d_phase.add(Transparent3d {
+            draw_function: draw_aabb_function,
+            pipeline: contacts_pipeline.pipeline_id,
+            entity: Entity::from_raw(0),
+            distance: 0.0,
+        });
+    }
 }
 
 type DrawContacts = (
@@ -323,7 +308,6 @@ type DrawContacts = (
     SetContactViewBindGroup<0>,
     DrawContactInstances,
 );
-
 
 struct SetContactsPipeline;
 impl<P: PhaseItem> RenderCommand<P> for SetContactsPipeline {
@@ -369,7 +353,6 @@ impl<const I: usize> EntityRenderCommand for SetContactViewBindGroup<I> {
     }
 }
 
-
 struct DrawContactInstances;
 impl EntityRenderCommand for DrawContactInstances {
     type Param = SRes<ContactsMeta>;
@@ -386,10 +369,12 @@ impl EntityRenderCommand for DrawContactInstances {
         //info!("indexes {}", contacts_meta.index_count);
         pass.set_vertex_buffer(0, contacts_meta.vertex_buffer.slice(..));
         pass.set_vertex_buffer(1, contacts_meta.instance_buffer.slice(..));
-        pass.set_index_buffer(contacts_meta.index_buffer.slice(..), 0,
-            IndexFormat::Uint32,
+        pass.set_index_buffer(contacts_meta.index_buffer.slice(..), 0, IndexFormat::Uint32);
+        pass.draw_indexed(
+            0..contacts_meta.index_count,
+            0,
+            0..contacts_meta.instances.len() as u32,
         );
-        pass.draw_indexed(0..contacts_meta.index_count, 0, 0..contacts_meta.instances.len() as u32);
         //info!("draw {}", contacts_meta.instances.len());
         RenderCommandResult::Success
     }

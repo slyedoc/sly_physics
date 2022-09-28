@@ -1,10 +1,12 @@
 use bevy::{
+    asset::load_internal_asset,
     core_pipeline::core_3d::Transparent3d,
     ecs::system::{
         lifetimeless::{Read, SQuery, SRes},
         SystemParamItem,
     },
     prelude::*,
+    reflect::TypeUuid,
     render::{
         render_phase::*,
         render_resource::*,
@@ -12,13 +14,13 @@ use bevy::{
         texture::BevyDefault,
         view::{ViewUniform, ViewUniformOffset, ViewUniforms},
         Extract, RenderApp, RenderStage,
-    }, reflect::TypeUuid, asset::load_internal_asset,
+    },
 };
 use bytemuck::cast_slice;
 use iyes_loopless::state::CurrentState;
 
-use crate::{ types::Aabb};
-use super::{PhysicsDebugState, AABB_VERTEX_POSITIONS, AABB_INDICES, AABB_INDICES_LEN};
+use super::{PhysicsDebugState, AABB_INDICES, AABB_INDICES_LEN, AABB_VERTEX_POSITIONS};
+use crate::types::Aabb;
 
 const ENTITY_AABBS_SHADER: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 13235301471009851039);
@@ -27,9 +29,12 @@ pub struct DebugEntityAabbPlugin;
 
 impl Plugin for DebugEntityAabbPlugin {
     fn build(&self, app: &mut App) {
-
-
-        load_internal_asset!(app, ENTITY_AABBS_SHADER, "entity_aabb.wgsl", Shader::from_wgsl);
+        load_internal_asset!(
+            app,
+            ENTITY_AABBS_SHADER,
+            "entity_aabb.wgsl",
+            Shader::from_wgsl
+        );
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
@@ -43,8 +48,6 @@ impl Plugin for DebugEntityAabbPlugin {
         }
     }
 }
-
-
 
 fn extract_entity_aabbs(
     mut commands: Commands,
@@ -240,7 +243,7 @@ impl FromWorld for AabbsPipeline {
             },
             depth_stencil: Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
-                depth_compare: CompareFunction::Greater,
+                depth_compare: CompareFunction::Always,
                 stencil: StencilState {
                     front: StencilFaceState::IGNORE,
                     back: StencilFaceState::IGNORE,
@@ -314,7 +317,6 @@ type DrawAabb = (
     SetAabbBindGroup<1>,
     DrawAabbInstance,
 );
-
 
 struct SetAabbPipeline;
 impl<P: PhaseItem> RenderCommand<P> for SetAabbPipeline {

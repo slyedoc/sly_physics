@@ -42,7 +42,7 @@ fn vertex(
     out.world_normal = vertex.normal;
     out.uvw = vec3<f32>(vertex.uv, 0.0);
     out.clip_position = view.view_proj * out.world_position;
-    out.color = vec4<f32>(0.0, 0.0, 1.0, 1.0);
+    out.color = vec4<f32>(0.0, 0.0, 1.0, 0.1);
     return out;
 }
 

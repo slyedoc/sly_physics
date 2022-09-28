@@ -82,7 +82,7 @@ fn setup_motor_constraint(mut commands: Commands, item_assets: Res<ItemAssets>) 
         })
         .insert_bundle(RigidBodyBundle {
             collider: item_assets.box_collider.clone(),
-            mass: Mass(0.1),
+            mass: Mass(1.0),
 
             ..default()
         })
@@ -105,7 +105,7 @@ fn setup_motor_constraint(mut commands: Commands, item_assets: Res<ItemAssets>) 
         // Add our motor
         .insert(MotorConstraint {
             parent: Some(base),
-            parent_offset: vec3(0., 2., 0.),
+            anchor_b: vec3(0., 2., 0.),
             motor_speed: 1.0,
             motor_axis: Vec3::Y,
             ..default()
@@ -120,7 +120,7 @@ fn setup_orientation_constraint(mut commands: Commands, box_config: Res<ItemAsse
         .spawn_bundle(PbrBundle {
             mesh: box_config.box_mesh.clone(),
             material: box_config.material.clone(),
-            transform: Transform::from_translation(pos ),
+            transform: Transform::from_translation(pos),
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
@@ -143,9 +143,9 @@ fn setup_orientation_constraint(mut commands: Commands, box_config: Res<ItemAsse
             mass: Mass(0.1),
             ..default()
         })
-        .insert(OrientationConstraint {            
+        .insert(OrientationConstraint {
             parent: Some(base),
-            parent_offset: vec3(0., 2.0, 0.),
+            anchor_b: vec3(0., 2.0, 0.),
             ..default()
         })
         .insert(Name::new("Orientation"));
@@ -158,7 +158,7 @@ fn setup_distance_constraint(mut commands: Commands, box_config: Res<ItemAssets>
         .spawn_bundle(PbrBundle {
             mesh: box_config.box_mesh.clone(),
             material: box_config.material.clone(),
-            transform: Transform::from_translation(pos ),
+            transform: Transform::from_translation(pos),
             ..default()
         })
         .insert_bundle(RigidBodyBundle {

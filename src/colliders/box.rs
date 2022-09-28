@@ -1,9 +1,6 @@
 use bevy::{math::vec3, prelude::*};
 
-use crate::{
-    types::*,
-    BOUNDS_EPS, prelude::Ray,
-};
+use crate::{prelude::Ray, types::*, BOUNDS_EPS};
 
 use super::{fastest_linear_speed, find_support_point, Collidable};
 
@@ -81,15 +78,10 @@ impl Collidable for Box {
         self.aabb
     }
 
-    fn get_world_aabb(
-        &self,
-        trans: &GlobalTransform,
-        velocity: &Velocity,
-        time: f32,
-    ) -> Aabb {
+    fn get_world_aabb(&self, trans: &GlobalTransform, velocity: &Velocity, time: f32) -> Aabb {
         let mut aabb = Aabb::default();
         for pt in &self.verts {
-            aabb.expand_by_point( trans.mul_vec3(*pt));
+            aabb.expand_by_point(trans.mul_vec3(*pt));
         }
         // expand by the linear velocity
         let p1 = aabb.mins + velocity.linear * time;
@@ -116,7 +108,6 @@ impl Collidable for Box {
     }
     // Returns distance at which ray would hit the sphere, or None if it doesn't hit
     fn intersect(&self, ray: &mut Ray) -> Option<f32> {
-        
         let mut tmin = (self.aabb.mins.x - ray.origin.x) / ray.direction.x;
         let mut tmax = (self.aabb.maxs.x - ray.origin.x) / ray.direction.x;
 
