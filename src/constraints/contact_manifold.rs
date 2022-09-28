@@ -2,7 +2,6 @@ use crate::{
     math::{lcp_gauss_seidel, MatMN, MatN, VecN},
     types::*,
     CenterOfMass, Contact, PhysicsConfig, RBHelper, RBQuery, MAX_MANIFOLD_CONTACTS,
-    MAX_SOLVE_ITERS,
 };
 use bevy::{prelude::*, utils::HashMap};
 use bevy_inspector_egui::Inspectable;
@@ -284,8 +283,12 @@ pub fn pre_solve(
         .retain(|_pair, manifold| !manifold.constraints.is_empty())
 }
 
-pub fn solve(mut manifold_arena: ResMut<ContactManifolds>, mut rb_query: Query<RBQuery>) {
-    for _ in 0..MAX_SOLVE_ITERS {
+pub fn solve(
+    mut manifold_arena: ResMut<ContactManifolds>, 
+    mut rb_query: Query<RBQuery>,
+    config: Res<PhysicsConfig>,
+) {
+    for _ in 0..config.solver_iterations {
         for (pair, manifold) in &mut manifold_arena.manifolds {
             if let Ok([mut a, mut b]) = rb_query.get_many_mut([pair.a, pair.b]) {
                 for constraint in manifold.constraints.iter_mut() {

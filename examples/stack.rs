@@ -1,5 +1,5 @@
 use bevy::{math::vec3, prelude::*, window::PresentMode};
-use bevy_inspector_egui::prelude::*;
+use bevy_inspector_egui::{prelude::*, widgets::ResourceInspector};
 use helper::{AppState, HelperPlugin};
 use iyes_loopless::prelude::*;
 use sly_physics::prelude::*;
@@ -40,6 +40,8 @@ pub struct Stack {
     time_scale: f32,
     mode: StackMode,
     ball_velocity: f32,
+
+    config: ResourceInspector<PhysicsConfig>,
 }
 
 #[derive(Inspectable)]
@@ -66,6 +68,7 @@ impl Default for Stack {
             time_scale: 1.0,
             mode: StackMode::Cube,
             ball_velocity: 0.0,
+            config: Default::default(),
         }
     }
 }

@@ -11,7 +11,6 @@ use crate::{
     math::{MatMN, VecN},
     types::*,
     PhysicsConfig, PhysicsFixedUpdate, PhysicsState, PhysicsSystem, RBHelper, RBQuery, RBQueryItem,
-    MAX_SOLVE_ITERS,
 };
 use bevy::prelude::*;
 
@@ -163,8 +162,9 @@ fn solve(
     mut motor_query: Query<(Entity, &mut MotorConstraint)>,
     mut orientation_query: Query<(Entity, &mut OrientationConstraint)>,
     mut rb_query: Query<RBQuery>,
+    config: Res<PhysicsConfig>,
 ) {
-    for _ in 0..MAX_SOLVE_ITERS {
+    for _ in 0..config.solver_iterations {
         for (entity, mut c) in distance_query.iter_mut() {
             if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
                 c.solve(&mut a, &mut b);

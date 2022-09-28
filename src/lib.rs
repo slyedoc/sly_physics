@@ -25,7 +25,6 @@ use types::*;
 pub const PHYSICS_TIMESTEP: f64 = 1.0 / 60.0;
 
 const MAX_MANIFOLD_CONTACTS: usize = 4;
-const MAX_SOLVE_ITERS: u32 = 5;
 const BVH_BIN_COUNT: usize = 8;
 
 // 30 rad/s is fast enough for us
@@ -88,12 +87,14 @@ pub enum PhysicsState {
 #[derive(Inspectable)]
 pub struct PhysicsConfig {
     pub time: f32,
+    pub solver_iterations: u32,
 }
 
 impl Default for PhysicsConfig {
     fn default() -> Self {
         PhysicsConfig {
             time: PHYSICS_TIMESTEP as f32,
+            solver_iterations: 5,
         }
     }
 }
