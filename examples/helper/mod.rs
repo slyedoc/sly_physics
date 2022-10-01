@@ -6,6 +6,7 @@ mod text_overlay;
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{math::vec3, prelude::*};
+use bevy_inspector_egui::{InspectorPlugin, Inspectable, widgets::ResourceInspector};
 use iyes_loopless::prelude::*;
 use sly_camera_controller::{CameraController, CameraControllerPlugin};
 use sly_physics::prelude::*;
@@ -20,6 +21,7 @@ pub struct HelperPlugin;
 impl Plugin for HelperPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(AppState::Playing)
+            .add_plugin(InspectorPlugin::<DebugConfig>::new())
             .init_resource::<FontAssets>()
             .init_resource::<ButtonColors>()
             .add_plugin(CameraControllerPlugin)
@@ -40,6 +42,12 @@ impl Plugin for HelperPlugin {
 pub enum AppState {
     Reset,
     Playing,
+}
+
+#[derive(Default, Inspectable)]
+pub struct DebugConfig {
+    config: ResourceInspector<PhysicsConfig>,
+    //tlas: ResourceInspector<Tlas>,
 }
 
 pub fn setup_camera(mut commands: Commands) {

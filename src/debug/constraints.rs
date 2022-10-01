@@ -52,10 +52,10 @@ impl Plugin for DebugConstraintsPlugin {
                     RenderStage::Extract,
                     extract_anchors::<OrientationConstraint>,
                 )
-                .add_system_to_stage(RenderStage::Extract, extract_anchors::<HingeQuatConstraint>)
+                .add_system_to_stage(RenderStage::Extract, extract_anchors::<HingeConstraint>)
                 .add_system_to_stage(
                     RenderStage::Extract,
-                    extract_anchors::<HingeQuatLimitedConstraint>,
+                    extract_anchors::<HingeLimitedConstraint>,
                 )
                 .add_system_to_stage(RenderStage::Extract, extract_anchors::<DistanceConstraint>)
                 .add_system_to_stage(RenderStage::Prepare, prepare_constraints)
@@ -178,7 +178,7 @@ impl FromWorld for ConstraintsPipeline {
             },
             depth_stencil: Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
-                depth_compare: CompareFunction::Greater,
+                depth_compare: CompareFunction::Always,
                 stencil: StencilState {
                     front: StencilFaceState::IGNORE,
                     back: StencilFaceState::IGNORE,
@@ -263,9 +263,9 @@ fn extract_anchors<T: Component + Constrainable>(
     if current_state.0 == PhysicsDebugState::Running {
         for (e, constraint) in constraint_query
             .iter()
-            .filter(|(_e, c)| c.get_parent().is_some())
+            .filter(|(_e, c)| c.get_b().is_some())
         {
-            if let Ok([trans_a, trans_b]) = rb_query.get_many([e, constraint.get_parent().unwrap()])
+            if let Ok([trans_a, trans_b]) = rb_query.get_many([e, constraint.get_b().unwrap()])
             {
                 gpu_lines.lines.push(Line {
                     start: trans_a.translation,

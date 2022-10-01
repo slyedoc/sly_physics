@@ -1,6 +1,6 @@
 use crate::{
-    constraints::{quat_left, quat_right, RBQueryItem},
-    math::{lcp_gauss_seidel, MatMN, MatN, VecN},
+    RBQueryItem,
+    math::*,
     types::*,
 };
 use bevy::prelude::*;
@@ -11,7 +11,7 @@ use super::{Constrainable, Constraint};
 #[reflect(Component)]
 pub struct MotorConstraint {
     pub anchor_a: Vec3,
-    pub parent: Option<Entity>,
+    pub b: Option<Entity>,
     pub anchor_b: Vec3,
 
     pub motor_axis: Vec3,
@@ -26,7 +26,7 @@ impl Default for MotorConstraint {
     fn default() -> Self {
         Self {
             anchor_b: Vec3::ZERO,
-            parent: None,
+            b: None,
             anchor_a: Vec3::ZERO,
             q0: None,
             motor_axis: Vec3::Y,
@@ -39,8 +39,8 @@ impl Default for MotorConstraint {
 }
 
 impl Constrainable for MotorConstraint {
-    fn get_parent(&self) -> Option<Entity> {
-        self.parent
+    fn get_b(&self) -> Option<Entity> {
+        self.b
     }
 
     fn get_anchor_a(&self) -> Vec3 {

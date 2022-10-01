@@ -20,8 +20,11 @@ pub fn narrow_phase(
     config: Res<PhysicsConfig>,
     colliders: Res<Assets<Collider>>,
 ) {
-    let contact_results = broad_contacts.iter()
-     .collect::<Vec<_>>()
+    let broad_contacts = broad_contacts.iter()
+     .collect::<Vec<_>>();
+    info!("Narrow phase contacts: {}", broad_contacts.len());
+
+    let contact_results = broad_contacts
      .par_splat_map(ComputeTaskPool::get(), None, |chunk| {
         let mut chunk_contacts = Vec::with_capacity(chunk.len());
         for broad_contact in chunk.iter() {
@@ -95,7 +98,8 @@ pub fn narrow_phase(
                     config.time,
                 ),
             };
-            if let Some(c) = contact {
+            if let Some(mut c) = contact {    
+                c.correct();            
                 chunk_contacts.push(c);
             }
         }

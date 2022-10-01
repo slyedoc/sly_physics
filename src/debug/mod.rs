@@ -46,6 +46,7 @@ pub struct PhysicsDebugPlugin;
 impl Plugin for PhysicsDebugPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(PhysicsDebugState::Paused)
+            .add_plugin(DebugBvhCameraPlugin)
             // Rendering debug systems
             // TODO: These are some of the first pipelines I have made, and all 3 use different techniques
             // as I was learning, should most likely switch them to draw_indexed instanced
@@ -54,8 +55,5 @@ impl Plugin for PhysicsDebugPlugin {
             .add_plugin(DebugBvhAabbPlugin) // expanded index buffer, one draw call
             .add_plugin(DebugContactsPlugin) // draw_indexed instanced, one draw call
             .add_plugin(DebugConstraintsPlugin); // draw_indexed instanced,
-
-        // raycast test plugin
-        //.add_plugin(PhysicsBvhCameraPlugin);
     }
 }

@@ -2,6 +2,7 @@ mod ray;
 mod tlas;
 mod tri;
 
+use bevy_inspector_egui::Inspectable;
 pub use ray::*;
 pub use tlas::*;
 pub use tri::*;
@@ -9,7 +10,7 @@ pub use tri::*;
 use crate::{prelude::Collider, types::Aabb};
 use bevy::prelude::*;
 
-#[derive(Default, Debug)]
+#[derive(Default, Inspectable, Debug)]
 pub struct BvhNode {
     pub aabb: Aabb,
     pub left_first: u32,
@@ -28,9 +29,9 @@ impl BvhNode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Inspectable, Default)]
 pub struct BvhInstance {
-    pub entity: Entity,
+    pub entity: Option<Entity>,
     pub collider: Handle<Collider>,
     pub inv_trans: Mat4,
     pub bounds: Aabb,

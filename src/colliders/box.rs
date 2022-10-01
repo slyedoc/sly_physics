@@ -1,16 +1,22 @@
 use bevy::{math::vec3, prelude::*};
+use bevy_inspector_egui::Inspectable;
 
 use crate::{prelude::Ray, types::*, BOUNDS_EPS};
 
 use super::{fastest_linear_speed, find_support_point, Collidable};
 
-#[derive(Debug)]
+#[derive(Debug, Inspectable)]
 pub struct Box {
     pub size: Vec3,
     pub verts: Vec<Vec3>,
     pub center_of_mass: Vec3,
     pub aabb: Aabb,
     pub inertia_tensor: Mat3,
+}
+impl Default for Box {
+    fn default() -> Self {
+        Self::new(vec3(1.0, 1.0, 1.0))
+    }
 }
 
 impl Box {

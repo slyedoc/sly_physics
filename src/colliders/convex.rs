@@ -5,6 +5,7 @@ use bevy::{
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
 };
+use bevy_inspector_egui::Inspectable;
 
 use crate::{
     bvh::{Bin, BvhNode, BvhTri},
@@ -15,7 +16,7 @@ use crate::{
 
 use super::{fastest_linear_speed, find_support_point, Collidable};
 
-#[derive(Debug)]
+#[derive(Debug, Inspectable)]
 pub struct Convex {
     verts: Vec<Vec3>,
     pub mesh: Mesh,
@@ -27,7 +28,21 @@ pub struct Convex {
     pub bvh_tris: Vec<BvhTri>,
     pub triangle_indexes: Vec<usize>,
 }
-
+impl Default for Convex {
+    fn default() -> Self {
+        let verts = vec![
+            vec3(-1.0, -1.0, -1.0),
+            vec3(-1.0, -1.0, 1.0),
+            vec3(-1.0, 1.0, -1.0),
+            vec3(-1.0, 1.0, 1.0),
+            vec3(1.0, -1.0, -1.0),
+            vec3(1.0, -1.0, 1.0),
+            vec3(1.0, 1.0, -1.0),
+            vec3(1.0, 1.0, 1.0),
+        ];
+        Self::new(&verts)
+    }
+}
 impl Convex {
     pub fn new(verts: &[Vec3]) -> Self {
         let (hull_points, hull_tris) = build_convex_hull(verts);

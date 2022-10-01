@@ -1,9 +1,10 @@
 use crate::{prelude::Ray, types::*, BOUNDS_EPS};
 use bevy::{math::vec3, prelude::*};
+use bevy_inspector_egui::Inspectable;
 
 use super::Collidable;
 
-#[derive(Debug)]
+#[derive(Debug, Inspectable)]
 pub struct Sphere {
     pub radius: f32,
     aabb: Aabb,

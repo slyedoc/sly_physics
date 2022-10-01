@@ -3,7 +3,7 @@ use crate::{
     types::*,
     CenterOfMass, Contact, PhysicsConfig, RBHelper, RBQuery, MAX_MANIFOLD_CONTACTS,
 };
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{prelude::*, utils::{HashMap}};
 use bevy_inspector_egui::Inspectable;
 use smallvec::SmallVec;
 
@@ -38,7 +38,7 @@ impl Eq for EntityPair {}
 
 impl std::hash::Hash for EntityPair {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let product = self.a.id() * self.b.id();
+        let product = (self.a.id() as u64) << 32 & self.b.id() as u64;
         product.hash(state);
     }
 }
@@ -138,7 +138,7 @@ impl PenetrationConstraint {
             cached_lambda: VecN::zero(),
             normal,
             baumgarte: 0.0,
-            friction: 0.0,
+            friction: 2.0,
         }
     }
 
@@ -292,18 +292,22 @@ pub fn solve(
         for (pair, manifold) in &mut manifold_arena.manifolds {
             if let Ok([mut a, mut b]) = rb_query.get_many_mut([pair.a, pair.b]) {
                 for constraint in manifold.constraints.iter_mut() {
+                    //let t0 = Instant::now();
                     let jacobian_transpose = constraint.jacobian.transpose();
-
+                    //let t1 = Instant::now();
                     // build the system of equations
                     let q_dt = Constraint::get_velocities(&a.velocity, &b.velocity);
                     let inv_mass_matrix = Constraint::get_inverse_mass_matrix(&a, &b);
+                    //let t2 = Instant::now();
                     let j_w_jt = constraint.jacobian * inv_mass_matrix * jacobian_transpose;
+                    //let t3 = Instant::now();
                     let mut rhs = constraint.jacobian * q_dt * -1.0;
+                    
                     rhs[0] -= constraint.baumgarte;
-
+                    //let t4 = Instant::now();
                     // solve for the Lagrange multipliers
                     let mut lambda_n = lcp_gauss_seidel(&MatN::from(j_w_jt), &rhs);
-
+                    //let t5 = Instant::now();
                     // accumulate the impulses and clamp within the constraint limits
                     let old_lambda = constraint.cached_lambda;
                     constraint.cached_lambda += lambda_n;
@@ -336,10 +340,12 @@ pub fn solve(
                         }
                     }
                     lambda_n = constraint.cached_lambda - old_lambda;
-
+                    //let t6 = Instant::now();
                     // apply the impulses
                     let impulses = jacobian_transpose * lambda_n;
                     Constraint::apply_impulses(&mut a, &mut b, impulses);
+                    //let t7 = Instant::now();
+                    //info!("Time: t1: {:?} t2: {:?} t3: {:?} t4: {:?} t5: {:?} t6: {:?} t7: {:?}", t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5, t7 - t6);
                 }
             }
         }

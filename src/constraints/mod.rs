@@ -2,30 +2,25 @@
 mod constant_velocity_constrant;
 mod contact_manifold;
 mod distance_constraint;
-mod hinge_quat_constraint;
-mod hinge_quat_limited_constraint;
+mod hinge_constraint;
+mod hinge_limited_constraint;
 mod motor_constraint;
 mod orientation_constraint;
 
+pub use contact_manifold::*;
+pub use distance_constraint::*;
+pub use hinge_constraint::*;
+pub use hinge_limited_constraint::*;
+pub use motor_constraint::*;
+pub use orientation_constraint::*;
+
 use crate::{
-    math::{MatMN, VecN},
-    types::*,
-    PhysicsConfig, PhysicsFixedUpdate, PhysicsState, PhysicsSystem, RBHelper, RBQuery, RBQueryItem,
+    math::*, types::*, PhysicsConfig, PhysicsFixedUpdate, PhysicsState, PhysicsSystem, RBHelper,
+    RBQuery, RBQueryItem,
 };
 use bevy::prelude::*;
 
 use iyes_loopless::prelude::*;
-// use constraint_constant_velocity::ConstraintConstantVelocityLimited;
-// use constraint_distance::ConstraintDistance;
-// use constraint_hinge_quat::ConstraintHingeQuatLimited;
-
-// use constraint_mover::ConstraintMoverSimple;
-pub use contact_manifold::*;
-pub use distance_constraint::*;
-pub use hinge_quat_constraint::*;
-pub use hinge_quat_limited_constraint::*;
-pub use motor_constraint::*;
-pub use orientation_constraint::*;
 
 pub struct PhysicsConstraintsPlugin;
 
@@ -82,8 +77,8 @@ impl Plugin for PhysicsConstraintsPlugin {
             )
             .register_type::<MotorConstraint>()
             .register_type::<OrientationConstraint>()
-            .register_type::<HingeQuatConstraint>()
-            .register_type::<HingeQuatLimitedConstraint>();
+            .register_type::<HingeConstraint>()
+            .register_type::<HingeLimitedConstraint>();
     }
 }
 
@@ -110,7 +105,7 @@ fn add_manifold_contacts(
 }
 
 pub trait Constrainable {
-    fn get_parent(&self) -> Option<Entity>;
+    fn get_b(&self) -> Option<Entity>;
     fn get_anchor_a(&self) -> Vec3;
     fn get_anchor_b(&self) -> Vec3;
 
@@ -121,35 +116,35 @@ pub trait Constrainable {
 
 fn pre_solve(
     mut distance_query: Query<(Entity, &mut DistanceConstraint)>,
-    mut hinge_query: Query<(Entity, &mut HingeQuatConstraint)>,
-    mut hinge_limited_query: Query<(Entity, &mut HingeQuatLimitedConstraint)>,
+    mut hinge_query: Query<(Entity, &mut HingeConstraint)>,
+    mut hinge_limited_query: Query<(Entity, &mut HingeLimitedConstraint)>,
     mut motor_query: Query<(Entity, &mut MotorConstraint)>,
     mut orientation_query: Query<(Entity, &mut OrientationConstraint)>,
     mut rb_query: Query<RBQuery>,
     config: Res<PhysicsConfig>,
 ) {
-    for (entity, mut c) in hinge_query.iter_mut() {
-        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+    for (entity, mut c) in distance_query.iter_mut() {
+        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
             c.pre_solve(&mut a, &mut b, config.time);
         }
     }
-    for (entity, mut c) in distance_query.iter_mut() {
-        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+    for (entity, mut c) in hinge_query.iter_mut() {
+        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
             c.pre_solve(&mut a, &mut b, config.time);
         }
     }
     for (entity, mut c) in hinge_limited_query.iter_mut() {
-        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
             c.pre_solve(&mut a, &mut b, config.time);
         }
     }
     for (entity, mut c) in motor_query.iter_mut() {
-        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
             c.pre_solve(&mut a, &mut b, config.time);
         }
     }
     for (entity, mut c) in orientation_query.iter_mut() {
-        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+        if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
             c.pre_solve(&mut a, &mut b, config.time);
         }
     }
@@ -157,36 +152,45 @@ fn pre_solve(
 
 fn solve(
     mut distance_query: Query<(Entity, &mut DistanceConstraint)>,
-    mut hinge_query: Query<(Entity, &mut HingeQuatConstraint)>,
-    mut hinge_limited_query: Query<(Entity, &mut HingeQuatLimitedConstraint)>,
+    mut hinge_query: Query<(Entity, &mut HingeConstraint)>,
+    mut hinge_limited_query: Query<(Entity, &mut HingeLimitedConstraint)>,
     mut motor_query: Query<(Entity, &mut MotorConstraint)>,
     mut orientation_query: Query<(Entity, &mut OrientationConstraint)>,
     mut rb_query: Query<RBQuery>,
     config: Res<PhysicsConfig>,
 ) {
     for _ in 0..config.solver_iterations {
-        for (entity, mut c) in distance_query.iter_mut() {
-            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+        for (entity, mut c) in distance_query
+            .iter_mut()
+            .filter(|(_, c)| c.b.is_some())
+        {
+            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
                 c.solve(&mut a, &mut b);
             }
         }
-        for (entity, mut c) in hinge_query.iter_mut() {
-            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+        for (entity, mut c) in hinge_query.iter_mut().filter(|(_, c)| c.b.is_some()) {
+            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
                 c.solve(&mut a, &mut b);
             }
         }
-        for (entity, mut c) in hinge_limited_query.iter_mut() {
-            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+        for (entity, mut c) in hinge_limited_query
+            .iter_mut()
+            .filter(|(_, c)| c.b.is_some())
+        {
+            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
                 c.solve(&mut a, &mut b);
             }
         }
-        for (entity, mut c) in motor_query.iter_mut() {
-            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+        for (entity, mut c) in motor_query.iter_mut().filter(|(_, c)| c.b.is_some()) {
+            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
                 c.solve(&mut a, &mut b);
             }
         }
-        for (entity, mut c) in orientation_query.iter_mut() {
-            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.parent.unwrap()]) {
+        for (entity, mut c) in orientation_query
+            .iter_mut()
+            .filter(|(_, c)| c.b.is_some())
+        {
+            if let Ok([mut a, mut b]) = rb_query.get_many_mut([entity, c.b.unwrap()]) {
                 c.solve(&mut a, &mut b);
             }
         }
@@ -195,8 +199,8 @@ fn solve(
 
 fn post_solve(
     mut distance_query: Query<&mut DistanceConstraint>,
-    mut hinge_query: Query<&mut HingeQuatConstraint>,
-    mut hinge_limited_query: Query<&mut HingeQuatLimitedConstraint>,
+    mut hinge_query: Query<&mut HingeConstraint>,
+    mut hinge_limited_query: Query<&mut HingeLimitedConstraint>,
     mut motor_query: Query<&mut MotorConstraint>,
     mut orientation_query: Query<&mut OrientationConstraint>,
 ) {
@@ -277,7 +281,6 @@ impl Constraint {
         q_dt
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn apply_impulses(a: &mut RBQueryItem, b: &mut RBQueryItem, impulses: VecN<12>) {
         {
             let force_internal_a = Vec3::from_slice(&impulses[0..]);
@@ -469,21 +472,3 @@ impl Constraint {
 //     //     }
 //     // }
 // }
-
-pub fn quat_left(q: Quat) -> Mat4 {
-    Mat4::from_cols(
-        Vec4::new(q.w, -q.x, -q.y, -q.z),
-        Vec4::new(q.x, q.w, -q.z, q.y),
-        Vec4::new(q.y, q.z, q.w, -q.x),
-        Vec4::new(q.z, -q.y, q.x, q.w),
-    )
-}
-
-pub fn quat_right(q: Quat) -> Mat4 {
-    Mat4::from_cols(
-        Vec4::new(q.w, -q.x, -q.y, -q.z),
-        Vec4::new(q.x, q.w, q.z, -q.y),
-        Vec4::new(q.y, -q.z, q.w, q.x),
-        Vec4::new(q.z, q.y, -q.x, q.w),
-    )
-}

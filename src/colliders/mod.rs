@@ -2,6 +2,7 @@ mod r#box;
 mod convex;
 mod sphere;
 
+use bevy_inspector_egui::Inspectable;
 pub use convex::*;
 pub use r#box::*;
 pub use sphere::*;
@@ -10,7 +11,7 @@ use crate::{prelude::Ray, types::*};
 use bevy::{prelude::*, reflect::TypeUuid};
 use enum_dispatch::*;
 
-#[derive(Debug, TypeUuid)]
+#[derive(Debug, Inspectable, TypeUuid)]
 #[uuid = "241fb60c-c542-4043-a574-a8b28bb3761d"]
 #[enum_dispatch]
 pub enum Collider {

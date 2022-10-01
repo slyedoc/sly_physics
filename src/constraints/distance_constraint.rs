@@ -7,12 +7,12 @@ use bevy::prelude::*;
 
 use super::{Constrainable, Constraint};
 
-#[derive(Reflect, Component)]
+#[derive(Default, Reflect, Component)]
 #[reflect(Component)]
 pub struct DistanceConstraint {
-    pub parent: Option<Entity>,
-    pub parent_offset: Vec3,
-    pub offset: Vec3,
+    pub b: Option<Entity>,
+    pub anchor_b: Vec3,
+    pub anchor_a: Vec3,
     #[reflect(ignore)]
     pub jacobian: MatMN<1, 12>,
     #[reflect(ignore)]
@@ -20,40 +20,29 @@ pub struct DistanceConstraint {
     pub baumgarte: f32,
 }
 
-impl Default for DistanceConstraint {
-    fn default() -> Self {
-        Self {
-            parent_offset: Vec3::ZERO,
-            parent: None,
-            offset: Vec3::ZERO,
-            jacobian: MatMN::zero(),
-            cached_lambda: VecN::zero(),
-            baumgarte: Default::default(),
-        }
-    }
-}
+
 
 impl Constrainable for DistanceConstraint {
-    fn get_parent(&self) -> Option<Entity> {
-        self.parent
+    fn get_b(&self) -> Option<Entity> {
+        self.b
     }
 
     fn get_anchor_a(&self) -> Vec3 {
-        self.offset
+        self.anchor_a
     }
 
     fn get_anchor_b(&self) -> Vec3 {
-        self.parent_offset
+        self.anchor_b
     }
 
     fn pre_solve(&mut self, a: &mut RBQueryItem, b: &mut RBQueryItem, dt: f32) {
         // get the world space position of the hinge from body_a's orientation
         let world_anchor_a =
-            RBHelper::local_to_world(a.transform.as_ref(), a.center_of_mass, self.offset);
+            RBHelper::local_to_world(a.transform.as_ref(), a.center_of_mass, self.anchor_a);
 
         // get the world space position of the hinge from body_b's orientation
         let world_anchor_b =
-            RBHelper::local_to_world(b.transform.as_ref(), b.center_of_mass, self.parent_offset);
+            RBHelper::local_to_world(b.transform.as_ref(), b.center_of_mass, self.anchor_b);
 
         let r = world_anchor_b - world_anchor_a;
         let ra =

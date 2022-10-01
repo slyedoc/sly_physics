@@ -94,8 +94,6 @@ impl Ray {
     // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     #[inline(always)]
     pub fn intersect_triangle(&mut self, tri: &BvhTri) -> Option<f32> {
-        #[cfg(feature = "trace")]
-        let _span = info_span!("intersect_triangle").entered();
         let edge1 = tri.vertex1 - tri.vertex0;
         let edge2 = tri.vertex2 - tri.vertex0;
         let h = self.direction.cross(edge2);
@@ -126,8 +124,6 @@ impl Ray {
 
     #[inline(always)]
     pub fn intersect_aabb(&self, aabb: &Aabb) -> f32 {
-        #[cfg(feature = "trace")]
-        let _span = info_span!("intersect_aabb").entered();
         let tx1 = (aabb.mins.x - self.origin.x) * self.direction_inv.x;
         let tx2 = (aabb.maxs.x - self.origin.x) * self.direction_inv.x;
         let mut t_min = tx1.min(tx2);
@@ -160,9 +156,7 @@ impl Ray {
         &mut self,
         colliders: &Assets<Collider>,
         bvh_instance: &BvhInstance,
-    ) {
-        #[cfg(feature = "trace")]
-        let _span = info_span!("intersect_bvh_instance").entered();
+    ) {        
         let collider = colliders.get(&bvh_instance.collider).unwrap();
         // backup ray and transform original
         let mut backup_ray = *self;
@@ -178,7 +172,7 @@ impl Ray {
                         u: 0.5,
                         v: 0.5,
                         tri_index: 0,
-                        entity: bvh_instance.entity,
+                        entity: bvh_instance.entity.unwrap(),
                     });
                 }
             } else {
@@ -187,7 +181,7 @@ impl Ray {
                     u: 0.5,
                     v: 0.5,
                     tri_index: 0,
-                    entity: bvh_instance.entity,
+                    entity: bvh_instance.entity.unwrap(),
                 });
             }
         };
@@ -213,8 +207,8 @@ impl Ray {
                 }
                 continue;
             }
-            let mut child1 = &tlas.nodes[(node.left_right & 0xffff) as usize];
-            let mut child2 = &tlas.nodes[(node.left_right >> 16) as usize];
+            let mut child1 = &tlas.nodes[node.right()];
+            let mut child2 = &tlas.nodes[node.left()];
             let mut dist1 = self.intersect_aabb(&child1.aabb);
             let mut dist2 = self.intersect_aabb(&child2.aabb);
             if dist1 > dist2 {

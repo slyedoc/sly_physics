@@ -1,7 +1,8 @@
 use bevy::prelude::*;
+use bevy_inspector_egui::Inspectable;
 use std::ops::{Add, AddAssign};
 
-#[derive(Component, Debug, Reflect, Copy, Clone)]
+#[derive(Component, Inspectable, Debug, Reflect, Copy, Clone)]
 #[reflect(Component)]
 pub struct Aabb {
     pub mins: Vec3,
@@ -27,6 +28,7 @@ impl Add<Vec3> for Aabb {
     }
 }
 
+
 impl AddAssign<Vec3> for Aabb {
     fn add_assign(&mut self, pt: Vec3) {
         self.mins = Vec3::select(pt.cmplt(self.mins), pt, self.mins);
@@ -34,11 +36,45 @@ impl AddAssign<Vec3> for Aabb {
     }
 }
 
+
+impl Add<Aabb> for Aabb {
+    type Output = Self;
+    fn add(self, b: Aabb) -> Self::Output {
+        Aabb {
+            mins: Vec3::min(self.mins, b.mins),
+            maxs: Vec3::max(self.maxs, b.maxs),
+        }
+    }
+}
+
+impl AddAssign<Aabb> for Aabb {
+    fn add_assign(&mut self, rhs: Aabb) {
+        self.mins = self.mins.min(rhs.mins);
+        self.maxs = self.mins.max(rhs.maxs);
+    }
+}
+
+#[test]
+fn test_aabb_add() {
+    let a = Aabb {
+        mins: Vec3::new(0.0, 0.0, 0.0),
+        maxs: Vec3::new(1.0, 1.0, 1.0),
+    };
+    let b = Aabb {
+        mins: Vec3::new(1.0, 1.0, 1.0),
+        maxs: Vec3::new(2.0, 2.0, 2.0),
+    };
+    let c = a + b;
+    assert_eq!(c.mins, Vec3::new(0.0, 0.0, 0.0));    
+    assert_eq!(c.maxs, Vec3::new(2.0, 2.0, 2.0));
+}
+
 impl Aabb {
     pub fn new(mins: Vec3, maxs: Vec3) -> Aabb {
         Aabb { mins, maxs }
     }
 
+    #[inline]
     pub fn intersection(&self, b: &Aabb) -> bool {
         // Exit with no intersection if separated along an axis
         if self.maxs[0] < b.mins[0] || self.mins[0] > b.maxs[0] {

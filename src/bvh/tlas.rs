@@ -1,41 +1,35 @@
+use bevy_inspector_egui::Inspectable;
+
 use crate::{types::Aabb, BvhInstance};
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Inspectable, Copy, Clone)]
 pub struct TlasNode {
     pub aabb: Aabb,
-    pub left_right: u32, // 2x16 bits
+    pub left: u16,
+    pub right: u16,
     pub blas: u32,
 }
 
 impl TlasNode {
     #[inline]
     pub fn left(&self) -> usize {
-        (self.left_right & 0xffff) as usize
+        self.left as usize
     }
 
     #[inline]
     pub fn right(&self) -> usize {
-        (self.left_right >> 16) as usize
+        self.right as usize
     }
     #[inline]
     pub fn is_leaf(&self) -> bool {
-        self.left_right == 0
+        self.left == 0 && self.right == 0
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Inspectable)]
 pub struct Tlas {
     pub nodes: Vec<TlasNode>,
     pub blas: Vec<BvhInstance>,
-}
-
-impl Default for Tlas {
-    fn default() -> Self {
-        Tlas {
-            nodes: Vec::with_capacity(0),
-            blas: Default::default(),
-        }
-    }
 }
 
 impl Tlas {

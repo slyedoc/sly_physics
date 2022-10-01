@@ -1,5 +1,5 @@
 use bevy::{math::vec3, prelude::*, window::PresentMode};
-use bevy_inspector_egui::{prelude::*, widgets::ResourceInspector};
+use bevy_inspector_egui::prelude::*;
 use helper::{AppState, HelperPlugin};
 use iyes_loopless::prelude::*;
 use sly_physics::prelude::*;
@@ -36,12 +36,22 @@ fn apply_scale(mut config: ResMut<PhysicsConfig>, stack: Res<Stack>) {
 pub struct Stack {
     count: (u32, u32, u32),
     spacing: f32,
-    //#[inspector()]
     time_scale: f32,
     mode: StackMode,
     ball_velocity: f32,
+}
 
-    config: ResourceInspector<PhysicsConfig>,
+impl Default for Stack {
+    fn default() -> Self {
+        let size = 8;
+        Self {
+            count: (size, size, size),
+            spacing: 1.1,
+            time_scale: 1.0,
+            mode: StackMode::Cube,
+            ball_velocity: 0.0,
+        }
+    }
 }
 
 #[derive(Inspectable)]
@@ -59,19 +69,7 @@ impl std::fmt::Display for StackMode {
     }
 }
 
-impl Default for Stack {
-    fn default() -> Self {
-        let size = 10;
-        Self {
-            count: (size, size, size),
-            spacing: 1.1,
-            time_scale: 1.0,
-            mode: StackMode::Cube,
-            ball_velocity: 0.0,
-            config: Default::default(),
-        }
-    }
-}
+
 
 pub fn setup(
     mut commands: Commands,
@@ -166,7 +164,7 @@ pub fn setup(
     commands
         .spawn_bundle(PbrBundle {
             transform: Transform::from_xyz(30.0, wreak_ball_radius + 1.0, 10.0),
-            mesh: meshes.add(Mesh::from(diamond_mesh)),
+            mesh: meshes.add(diamond_mesh),
             material: materials.add(StandardMaterial {
                 base_color: Color::rgb(0.0, 0.0, 1.0),
                 ..default()

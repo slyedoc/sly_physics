@@ -2,6 +2,9 @@ use bevy::prelude::*;
 
 use crate::{bvh::Tlas, types::*};
 
+
+
+
 // Sweep and Prune
 // The board phase is responsible for pruning the search space of possible collisions
 // I have tried different approaches, and I am sure I will try a few more
@@ -17,7 +20,7 @@ pub fn broad_phase(
 
     // Sort the array on currently selected sorting axis
     // Note: Update inter loop if you change the axis
-    list.sort_unstable_by(cmp_x_axis);
+    list.sort_unstable_by(cmp_y_axis);
 
     //let t1 = Instant::now();
     // Sweep the array for collisions
@@ -25,13 +28,8 @@ pub fn broad_phase(
         // Test collisions against all possible overlapping AABBs following current one
         for (b, aabb_b, static_b) in list.iter().skip(i + 1) {
             // Stop when tested AABBs are beyond the end of current AABB
-            if aabb_b.mins.x > aabb_a.maxs.x {
+            if aabb_b.mins.y > aabb_a.maxs.y {
                 break;
-            }
-
-            // stop if both are static
-            if static_a.is_some() && static_b.is_some() {
-                continue;
             }
 
             // SAT test
@@ -56,11 +54,11 @@ pub fn broad_phase(
                 continue;
             }
 
-            if a.id() < b.id() {
+            // stop if both are static
+            if static_a.is_none() || static_b.is_none() {
                 broad_contacts.send(BroadContact { a: *a, b: *b });
-            } else {
-                broad_contacts.send(BroadContact { a: *b, b: *a });
             }
+
         }
     }
 }
@@ -116,76 +114,49 @@ fn cmp_z_axis(
     std::cmp::Ordering::Equal
 }
 
-// TODO: The we should be able to traverse the bvh tree, 'tlas' in our case, for possible collision detection
-// This was as the one of the main reason i added bvh
-// I am missing something here, and this is broken
-
+// This works but is slower, tried quite a few different approaches
+// to beat sweep and prune, compute task to break it up, but this is 
+// the fastest form so far and but still slower
 #[allow(dead_code)]
 pub fn broad_phase_bvh(
     tlas: Res<Tlas>,
     mut broad_contacts: EventWriter<BroadContact>,
-    mut stack: Local<Vec<(usize, usize)>>,
-    mut completed: Local<Vec<(usize, usize)>>,
+    mut stack: Local<Vec<(u16, u16)>>,
     mut static_query: Query<Entity, With<Static>>,
-) {
-    let tlas = tlas.into_inner();
-
-    stack.clear();
-    completed.clear();
-
-    let root = &tlas.nodes[0];
-    stack.push((root.left(), root.right()));
-
-    let mut count = 0;
-    let mut skipped = 0;
-    let mut static_count = 0;
+) {    
+    for node in tlas.nodes.iter().filter(|n| !n.is_leaf()) {
+        stack.push((node.left, node.right));        
+    }
 
     while let Some((a, b)) = stack.pop() {
-        if completed.contains(&(a, b)) {
-            skipped += 1;
-            continue;
-        }
 
-        let node_a = &tlas.nodes[a];
-        let node_b = &tlas.nodes[b];
-
+        let node_a = &tlas.nodes[a as usize];
+        let node_b = &tlas.nodes[b as usize];
         if node_a.aabb.intersection(&node_b.aabb) {
-            let leaf_a = node_a.is_leaf();
-            let leaf_b = node_b.is_leaf();
-
-            if leaf_a && leaf_b {
+            if node_a.is_leaf() && node_b.is_leaf() {
                 // possible collision
-                let entity_a = tlas.blas[node_a.blas as usize].entity;
-                let entity_b = tlas.blas[node_b.blas as usize].entity;
+                let entity_a = tlas.blas[node_a.blas as usize].entity.unwrap();
+                let entity_b = tlas.blas[node_b.blas as usize].entity.unwrap();
 
                 // if both are not static send broad collision
                 if static_query.get_many_mut([entity_a, entity_b]).is_err() {
+                    //info!("Broad contact: {} {}", a, b);
                     broad_contacts.send(BroadContact {
-                        a: tlas.blas[node_a.blas as usize].entity,
-                        b: tlas.blas[node_b.blas as usize].entity,
+                        a: entity_a,
+                        b: entity_b,
                     });
-                } else {
-                    static_count += 1;
                 }
             } else {
                 // ‘Descend A’ descent rule
-                if !leaf_a {
-                    stack.push((node_a.right(), b));
-                    stack.push((node_a.left(), b));
+                if !node_a.is_leaf() {
+                    stack.push((node_a.right, b));
+                    stack.push((node_a.left, b));
 
-                    //children
-                    //stack.push((node_a.left(), node_a.right()));
                 } else {
-                    stack.push((a, node_b.right()));
-                    stack.push((a, node_b.left()));
+                    stack.push((a, node_b.right));
+                    stack.push((a, node_b.left));
                 }
             }
         }
-        completed.push((a, b));
-        count += 1;
     }
-    info!(
-        "count: {}, skipped {}, static {}",
-        count, skipped, static_count
-    );
 }

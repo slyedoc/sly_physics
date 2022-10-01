@@ -26,15 +26,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug example 'main'",
+            "name": "Debug example 'bvh_debug'",
             "cargo": {
                 "args": [
                     "build",
-                    "--example=main",
+                    "--example=bvh_debug",
                     "--package=sly_physics"
                 ],
                 "filter": {
-                    "name": "main",
+                    "name": "bvh_debug",
                     "kind": "example"
                 }
             },

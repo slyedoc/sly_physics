@@ -17,7 +17,6 @@ fn main() {
         .add_plugin(PhysicsPlugin)
         .add_plugin(GravityPlugin)
         .add_plugin(PhysicsDebugPlugin)
-        .add_plugin(DebugBvhCameraPlugin)
         .add_plugin(HelperPlugin)
         .add_startup_system(helper::setup_camera)
         .init_resource::<ItemAssets>()
@@ -25,8 +24,8 @@ fn main() {
         .add_enter_system(AppState::Playing, setup_motor_constraint)
         .add_enter_system(AppState::Playing, setup_orientation_constraint)
         .add_enter_system(AppState::Playing, setup_distance_constraint)
-        .add_enter_system(AppState::Playing, setup_hinge_quat_constraint)
-        .add_enter_system(AppState::Playing, setup_hinge_quat_limited_constraint)
+        .add_enter_system(AppState::Playing, setup_hinge_constraint)
+        .add_enter_system(AppState::Playing, setup_hinge_limited_constraint)
         .run();
 }
 
@@ -73,7 +72,7 @@ impl FromWorld for ItemAssets {
 fn setup_motor_constraint(mut commands: Commands, item_assets: Res<ItemAssets>) {
     let pos = vec3(4., 0.5, 0.);
 
-    let base = commands
+    let anchor = commands
         .spawn_bundle(PbrBundle {
             mesh: item_assets.box_mesh.clone(),
             material: item_assets.material.clone(),
@@ -104,7 +103,7 @@ fn setup_motor_constraint(mut commands: Commands, item_assets: Res<ItemAssets>) 
         })
         // Add our motor
         .insert(MotorConstraint {
-            parent: Some(base),
+            b: Some(anchor),
             anchor_b: vec3(0., 2., 0.),
             motor_speed: 1.0,
             motor_axis: Vec3::Y,
@@ -114,9 +113,9 @@ fn setup_motor_constraint(mut commands: Commands, item_assets: Res<ItemAssets>) 
 }
 
 fn setup_orientation_constraint(mut commands: Commands, box_config: Res<ItemAssets>) {
-    let pos = vec3(0., 0.5, 0.);
+    let pos = vec3(0., 5., 0.);
 
-    let base = commands
+    let anchor = commands
         .spawn_bundle(PbrBundle {
             mesh: box_config.box_mesh.clone(),
             material: box_config.material.clone(),
@@ -125,17 +124,17 @@ fn setup_orientation_constraint(mut commands: Commands, box_config: Res<ItemAsse
         })
         .insert_bundle(RigidBodyBundle {
             collider: box_config.box_collider.clone(),
-            mass: Mass(1.0),
+            mode: RigidBody::Static,
             ..default()
         })
-        .insert(Name::new("Orientation base"))
+        .insert(Name::new("Orientation Anchor"))
         .id();
 
     commands
         .spawn_bundle(PbrBundle {
             mesh: box_config.box_mesh.clone(),
             material: box_config.material.clone(),
-            transform: Transform::from_translation(pos + vec3(0., 2., 0.0)),
+            transform: Transform::from_translation(pos + vec3(1., -2., 0.0)),
             ..default()
         })
         .insert_bundle(RigidBodyBundle {
@@ -144,17 +143,18 @@ fn setup_orientation_constraint(mut commands: Commands, box_config: Res<ItemAsse
             ..default()
         })
         .insert(OrientationConstraint {
-            parent: Some(base),
-            anchor_b: vec3(0., 2.0, 0.),
+            anchor_a: vec3(0., 2.0, 0.),
+            b: Some(anchor),
+            
             ..default()
         })
         .insert(Name::new("Orientation"));
 }
 
 fn setup_distance_constraint(mut commands: Commands, box_config: Res<ItemAssets>) {
-    let pos = vec3(-4., 0.5, 0.);
+    let pos = vec3(-4., 10., -5.);
 
-    let parent = commands
+    let anchor = commands
         .spawn_bundle(PbrBundle {
             mesh: box_config.box_mesh.clone(),
             material: box_config.material.clone(),
@@ -163,33 +163,41 @@ fn setup_distance_constraint(mut commands: Commands, box_config: Res<ItemAssets>
         })
         .insert_bundle(RigidBodyBundle {
             collider: box_config.box_collider.clone(),
-            mass: Mass(1.0),
+            mode: RigidBody::Static,
             ..default()
         })
-        .insert(Name::new("Distance base"))
+        .insert(Name::new("Distance Anchor"))
         .id();
 
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh: box_config.box_mesh.clone(),
-            material: box_config.material.clone(),
-            transform: Transform::from_translation(pos + vec3(0., 2., 0.)),
-            ..default()
-        })
-        .insert_bundle(RigidBodyBundle {
-            collider: box_config.box_collider.clone(),
-            mass: Mass(1.0),
-            ..default()
-        })
-        .insert(DistanceConstraint {
-            parent_offset: vec3(0., 2., 0.),
-            parent: Some(parent),
-            ..default()
-        })
-        .insert(Name::new("Distance"));
+        // create links
+        let mut b = anchor;
+        let offset = 1.2;
+        for i in 0..5 {
+            let link = commands
+                .spawn_bundle(PbrBundle {
+                    mesh: box_config.box_mesh.clone(),
+                    material: box_config.material.clone(),
+                    transform: Transform::from_translation(pos + vec3(i as f32, (i + 1) as f32 * -offset, 0.0)),
+                    ..default()
+                })
+                .insert_bundle(RigidBodyBundle {
+                    collider: box_config.box_collider.clone(),
+                    mass: Mass(0.1),
+                    ..default()
+                })
+                .insert(DistanceConstraint {
+                    b: Some(b),
+                    anchor_a: vec3(0., offset, 0.),
+                    ..default()
+                })
+                .insert(Name::new(format!("Distance {i}")))
+                .id();
+            b = link;
+        }
+
 }
 
-fn setup_hinge_quat_constraint(mut commands: Commands, box_config: Res<ItemAssets>) {
+fn setup_hinge_constraint(mut commands: Commands, box_config: Res<ItemAssets>) {
     let pos = vec3(-8., 2.5, 0.);
 
     let parent = commands
@@ -201,10 +209,10 @@ fn setup_hinge_quat_constraint(mut commands: Commands, box_config: Res<ItemAsset
         })
         .insert_bundle(RigidBodyBundle {
             collider: box_config.box_collider.clone(),
-            mass: Mass(1.0),
+            mode: RigidBody::Static,
             ..default()
         })
-        .insert(Name::new("Hinge Quat Parent"))
+        .insert(Name::new("Hinge Anchor"))
         .id();
 
     commands
@@ -219,18 +227,20 @@ fn setup_hinge_quat_constraint(mut commands: Commands, box_config: Res<ItemAsset
             mass: Mass(1.0),
             ..default()
         })
-        .insert(HingeQuatConstraint {
-            offset: vec3(0., 1.0, 0.),
-            parent: Some(parent),
+        .insert(HingeConstraint {
+            anchor_a: vec3(-0.5, 0.5, 0.0),
+            anchor_b: vec3(-0.5, -0.5, 0.),
+            b: Some(parent),
+
             ..default()
         })
         .insert(Name::new("Hinge Quat"));
 }
 
-fn setup_hinge_quat_limited_constraint(mut commands: Commands, box_config: Res<ItemAssets>) {
+fn setup_hinge_limited_constraint(mut commands: Commands, box_config: Res<ItemAssets>) {
     let pos = vec3(-12., 2.5, 0.);
 
-    let parent = commands
+    let anchor = commands
         .spawn_bundle(PbrBundle {
             mesh: box_config.box_mesh.clone(),
             material: box_config.material.clone(),
@@ -239,10 +249,10 @@ fn setup_hinge_quat_limited_constraint(mut commands: Commands, box_config: Res<I
         })
         .insert_bundle(RigidBodyBundle {
             collider: box_config.box_collider.clone(),
-            mass: Mass(1.0),
+            mode: RigidBody::Static,
             ..default()
         })
-        .insert(Name::new("Hinge Quat Limited Parent"))
+        .insert(Name::new("Hinge Limited Anchor"))
         .id();
 
     commands
@@ -257,10 +267,12 @@ fn setup_hinge_quat_limited_constraint(mut commands: Commands, box_config: Res<I
             mass: Mass(1.0),
             ..default()
         })
-        .insert(HingeQuatLimitedConstraint {
-            offset: vec3(0., 1.0, 0.),
-            parent: Some(parent),
+        .insert(HingeLimitedConstraint {
+            anchor_a: vec3(-0.5, 0.5, 0.),
+            b: Some(anchor),
+            anchor_b: vec3(-0.5, -0.5, 0.),
+            axis: Vec3::Z,
             ..default()
         })
-        .insert(Name::new("Hinge Quat Limited"));
+        .insert(Name::new("Hinge Limited"));
 }

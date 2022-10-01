@@ -22,6 +22,17 @@ pub struct Contact {
     pub time_of_impact: f32,
 }
 
+impl Contact {
+    pub fn correct(&mut self){
+        if &self.a.id() > &self.b.id() {
+            std::mem::swap(&mut self.a, &mut self.b);
+            std::mem::swap(&mut self.world_point_a, &mut self.world_point_b);
+            std::mem::swap(&mut self.local_point_a, &mut self.local_point_b);
+            self.normal = -self.normal;
+        } 
+    }
+}
+
 pub struct ManifoldContact(pub Contact);
 
 pub struct RBHelper;

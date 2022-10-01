@@ -1,6 +1,6 @@
 use crate::{
-    constraints::{quat_left, quat_right, RBQueryItem},
-    math::{lcp_gauss_seidel, MatMN, MatN},
+    RBQueryItem,
+    math::*,
     types::*,
 };
 use bevy::prelude::*;
@@ -12,7 +12,7 @@ use super::{Constrainable, Constraint};
 pub struct OrientationConstraint {
     pub anchor_a: Vec3,
     #[reflect(ignore)]
-    pub parent: Option<Entity>,
+    pub b: Option<Entity>,
     pub anchor_b: Vec3,
     pub q0: Quat,
     #[reflect(ignore)]
@@ -21,8 +21,8 @@ pub struct OrientationConstraint {
 }
 
 impl Constrainable for OrientationConstraint {
-    fn get_parent(&self) -> Option<Entity> {
-        self.parent
+    fn get_b(&self) -> Option<Entity> {
+        self.b
     }
 
     fn get_anchor_a(&self) -> Vec3 {

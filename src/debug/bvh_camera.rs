@@ -29,7 +29,6 @@ impl Plugin for DebugBvhCameraPlugin {
                 PhysicsFixedUpdate,
                 render_image
                     .run_in_state(PhysicsDebugState::Running)
-                    .label(PhysicsSystem::Camera)
                     .after(PhysicsSystem::Resolve),
             )
             .add_exit_system(PhysicsDebugState::Running, remove_ui);
@@ -204,18 +203,13 @@ pub fn render_image(
     if let Some(image) = &camera.image {
         let image = images.get_mut(image).unwrap();
 
-        // TODO: after 0.8 ComputeTaskPool::get() fails, using this for now
-        let pool = TaskPoolBuilder::new()
-            .thread_name("Bvh Camera ThreadPool".to_string())
-            .build();
-
         // TODO: Make this acutally tilings, currenty this just takes a slice of pixels in a row
         const PIXEL_TILE_COUNT: usize = 64;
         const PIXEL_TILE: usize = 4 * PIXEL_TILE_COUNT;
 
         image
             .data
-            .par_chunk_map_enumerate_mut(&pool, PIXEL_TILE, |i, pixels| {
+            .par_chunk_map_enumerate_mut(ComputeTaskPool::get(), PIXEL_TILE, |i, pixels| {
                 for pixel_offset in 0..(pixels.len() / 4) {
                     let index = i * PIXEL_TILE_COUNT + pixel_offset;
                     let offset = pixel_offset * 4;

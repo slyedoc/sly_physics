@@ -102,15 +102,13 @@ impl Default for PhysicsConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemLabel)]
 pub enum PhysicsSystem {
     Setup,
-    SetupConvex,
     Update,
     UpdateTlas,
     Dynamics,
     Broad,
     Narrow,
-    Drag,
     Resolve,
-    Camera,
+    #[cfg(feature = "step")]
     Step,
 }
 
@@ -151,15 +149,14 @@ impl Plugin for PhysicsPlugin {
                     .with_system(update_aabb)
                     .into(),
             )
-            // .add_system_set_to_stage(
-            //     PhysicsFixedUpdate,
-            //     ConditionSet::new()
-            //         .run_in_state(PhysicsState::Running)
-            //         .after(PhysicsSystem::Update)
-            //         .with_system(update_tlas)
-            //         .into(),
-            // )
-            // phases
+            .add_system_set_to_stage(
+                PhysicsFixedUpdate,
+                ConditionSet::new()
+                    .run_in_state(PhysicsState::Running)
+                    .after(PhysicsSystem::Update)
+                    .with_system(update_tlas)
+                    .into(),
+            )
             // Dynamic Plugins add systems here
             .add_system_set_to_stage(
                 PhysicsFixedUpdate,
@@ -296,7 +293,7 @@ fn update_tlas(
     tlas.blas.clear();
     for (entity, col, trans, aabb) in query.iter() {
         tlas.blas.push(BvhInstance {
-            entity,
+            entity: Some(entity),
             collider: col.clone(),
             inv_trans: trans.compute_matrix().inverse(),
             bounds: *aabb,
@@ -309,16 +306,16 @@ fn update_tlas(
     // reserve root node
     tlas.nodes.push(TlasNode::default());
 
-    let mut node_index = vec![0u32; tlas.blas.len() + 1];
+    let mut node_index = vec![0u32;  tlas.blas.len() + 1];
     let mut node_indices = tlas.blas.len() as i32;
 
-    // assign a TLASleaf node for each BLAS and build node indexs
+    // assign a TLASleaf node for each BLAS and build node indexes
     for (i, (_entity, _col, _trans, aabb)) in query.iter().enumerate() {
         node_index[i] = i as u32 + 1;
         tlas.nodes.push(TlasNode {
             aabb: *aabb,
-            left_right: 0, // is leaf
             blas: i as u32,
+            ..default()
         });
     }
 
@@ -332,13 +329,11 @@ fn update_tlas(
             let node_index_b = node_index[b as usize];
             let node_a = &tlas.nodes[node_index_a as usize];
             let node_b = &tlas.nodes[node_index_b as usize];
-            let aabb = Aabb {
-                mins: node_a.aabb.mins.min(node_b.aabb.mins),
-                maxs: node_a.aabb.maxs.max(node_b.aabb.maxs),
-            };
+            let aabb =   node_a.aabb + node_b.aabb;
             tlas.nodes.push(TlasNode {
-                aabb,
-                left_right: node_index_a + (node_index_b << 16),
+                aabb: aabb,                
+                left: node_index_a as u16,
+                right: node_index_b as u16,
                 blas: 0,
             });
             node_index[a as usize] = tlas.nodes.len() as u32 - 1;
@@ -350,7 +345,9 @@ fn update_tlas(
             b = c;
         }
     }
-    tlas.nodes[0] = tlas.nodes[node_index[a as usize] as usize];
+    // update root node
+    tlas.nodes.swap(0, node_index[a as usize] as usize);   
+    tlas.nodes.remove(node_index[a as usize] as usize);
 }
 
 // TODO: We don't really want to copy the all tris, find better way
@@ -373,6 +370,3 @@ pub fn parse_verts(mesh: &Mesh) -> Vec<Vec3> {
         _ => todo!(),
     }
 }
-
-#[test]
-fn test_local_world() {}

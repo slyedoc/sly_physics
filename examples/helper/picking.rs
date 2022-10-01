@@ -63,32 +63,34 @@ fn cursor_system(
     mut egui_context: ResMut<EguiContext>,
     mut inspector: ResMut<Inspector>,
 ) {
-    let (camera, camera_transform) = camera_query.single();
-    let window = windows.primary();
-    if egui_context.ctx_mut().wants_pointer_input() {
-        return;
-    }
-    if let Some(mouse_pos) = window.cursor_position() {
-        let (mut cursor_trans, mut cursor_vis) = cusror_query.single_mut();
-        // create a ray
-        let mut ray = Ray::from_camera(camera, camera_transform, mouse_pos);
+    if let Ok((camera, camera_transform)) = camera_query.get_single() {
+        if let Some(window) = windows.get_primary() {
+            if egui_context.ctx_mut().wants_pointer_input() {
+                return;
+            }
+            if let Some(mouse_pos) = window.cursor_position() {
+                let (mut cursor_trans, mut cursor_vis) = cusror_query.single_mut();
+                // create a ray
+                let mut ray = Ray::from_camera(camera, camera_transform, mouse_pos);
 
-        // test ray agaist tlas and see if we hit
-        let hit_maybe = ray.intersect_tlas(&tlas, &colliders);
+                // test ray agaist tlas and see if we hit
+                let hit_maybe = ray.intersect_tlas(&tlas, &colliders);
 
-        if let Some(hit) = hit_maybe {
-            // we could do something with the entity here
-            cursor_trans.translation = ray.origin + ray.direction * hit.distance;
-            cursor_vis.is_visible = true;
-        } else {
-            cursor_vis.is_visible = false;
-        }
+                if let Some(hit) = hit_maybe {
+                    // we could do something with the entity here
+                    cursor_trans.translation = ray.origin + ray.direction * hit.distance;
+                    cursor_vis.is_visible = true;
+                } else {
+                    cursor_vis.is_visible = false;
+                }
 
-        if mouse_input.pressed(MouseButton::Left) {
-            if let Some(hit) = hit_maybe {
-                inspector.active = Some(hit.entity);
-            } else {
-                inspector.active = None;
+                if mouse_input.pressed(MouseButton::Left) {
+                    if let Some(hit) = hit_maybe {
+                        inspector.active = Some(hit.entity);
+                    } else {
+                        inspector.active = None;
+                    }
+                }
             }
         }
     }

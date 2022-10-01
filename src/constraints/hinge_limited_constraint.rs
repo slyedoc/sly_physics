@@ -1,20 +1,19 @@
 use crate::{
     constraints::RBQueryItem,
-    math::{lcp_gauss_seidel, MatMN, MatN, VecN},
-    prelude::{quat_left, quat_right},
+    math::*,
     types::*,
 };
 use bevy::prelude::*;
 
 use super::{Constrainable, Constraint};
 
-#[derive(Reflect, Component)]
+#[derive(Default, Reflect, Component)]
 #[reflect(Component)]
-pub struct HingeQuatLimitedConstraint {
+pub struct HingeLimitedConstraint {
     #[reflect(ignore)]
-    pub parent: Option<Entity>,
-    pub parent_offset: Vec3,
-    pub offset: Vec3,
+    pub b: Option<Entity>,    
+    pub anchor_a: Vec3,
+    pub anchor_b: Vec3,
     // the axis is defined in the local space
     pub axis: Vec3,
     pub relative_angle: f32, // in degrees
@@ -23,40 +22,24 @@ pub struct HingeQuatLimitedConstraint {
     // the initial relative quaternion q1^-1 * q2
     pub q0: Option<Quat>,
     #[reflect(ignore)]
-    pub jacobian: MatMN<3, 12>,
+    pub jacobian: MatMN<4, 12>,
     #[reflect(ignore)]
-    pub cached_lambda: VecN<3>,
+    pub cached_lambda: VecN<4>,
     pub baumgarte: f32,
 }
 
-impl Default for HingeQuatLimitedConstraint {
-    fn default() -> Self {
-        Self {
-            parent_offset: Vec3::ZERO,
-            parent: None,
-            axis: Vec3::ZERO,
-            offset: Vec3::ZERO,
-            q0: None,
-            jacobian: MatMN::zero(),
-            cached_lambda: VecN::zero(),
-            baumgarte: Default::default(),
-            relative_angle: 0.0,
-            is_angle_violated: false,
-        }
-    }
-}
 
-impl Constrainable for HingeQuatLimitedConstraint {
-    fn get_parent(&self) -> Option<Entity> {
-        self.parent
+impl Constrainable for HingeLimitedConstraint {
+    fn get_b(&self) -> Option<Entity> {
+        self.b
     }
 
     fn get_anchor_a(&self) -> Vec3 {
-        self.offset
+        self.anchor_a
     }
 
     fn get_anchor_b(&self) -> Vec3 {
-        self.parent_offset
+        self.anchor_b
     }
 
     fn pre_solve(&mut self, a: &mut RBQueryItem, b: &mut RBQueryItem, dt: f32) {
@@ -64,9 +47,9 @@ impl Constrainable for HingeQuatLimitedConstraint {
             self.q0 = Some(a.transform.rotation.inverse() * b.transform.rotation);
         }
         // get the world space position of the hinge from body_a's orientation
-        let world_anchor_a = RBHelper::local_to_world(&a.transform, a.center_of_mass, self.offset);
+        let world_anchor_a = RBHelper::local_to_world(&a.transform, a.center_of_mass, self.anchor_a);
         let world_anchor_b =
-            RBHelper::local_to_world(&b.transform, b.center_of_mass, self.parent_offset);
+            RBHelper::local_to_world(&b.transform, b.center_of_mass, self.anchor_b);
 
         let r = world_anchor_b - world_anchor_a;
         let ra = world_anchor_a - RBHelper::centre_of_mass_world(&a.transform, a.center_of_mass);

@@ -1,21 +1,22 @@
 use crate::{
     constraints::{Constrainable, Constraint, RBQueryItem},
-    math::{lcp_gauss_seidel, MatMN, MatN, VecN},
-    prelude::{quat_left, quat_right},
+    math::*,
     types::*,
 };
 use bevy::prelude::*;
 
-#[derive(Reflect, Component)]
+#[derive(Default, Reflect, Component)]
 #[reflect(Component)]
-pub struct HingeQuatConstraint {
+pub struct HingeConstraint {
     #[reflect(ignore)]
-    pub parent: Option<Entity>,
-    pub parent_offset: Vec3,
-    pub offset: Vec3,
+    pub b: Option<Entity>,
+    pub anchor_a: Vec3,
+    pub anchor_b: Vec3,
+
     pub axis: Vec3,
     // the initial relative quaternion q1^-1 * q2
     pub q0: Option<Quat>,
+
     #[reflect(ignore)]
     pub jacobian: MatMN<3, 12>,
     #[reflect(ignore)]
@@ -23,32 +24,17 @@ pub struct HingeQuatConstraint {
     pub baumgarte: f32,
 }
 
-impl Default for HingeQuatConstraint {
-    fn default() -> Self {
-        Self {
-            parent_offset: Vec3::ZERO,
-            parent: None,
-            axis: Vec3::ZERO,
-            offset: Vec3::ZERO,
-            q0: None,
-            jacobian: MatMN::zero(),
-            cached_lambda: VecN::zero(),
-            baumgarte: Default::default(),
-        }
-    }
-}
-
-impl Constrainable for HingeQuatConstraint {
-    fn get_parent(&self) -> Option<Entity> {
-        self.parent
+impl Constrainable for HingeConstraint {
+    fn get_b(&self) -> Option<Entity> {
+        self.b
     }
 
     fn get_anchor_a(&self) -> Vec3 {
-        self.offset
+        self.anchor_a
     }
 
     fn get_anchor_b(&self) -> Vec3 {
-        self.parent_offset
+        self.anchor_b
     }
 
     fn pre_solve(&mut self, a: &mut RBQueryItem, b: &mut RBQueryItem, dt: f32) {
@@ -56,18 +42,14 @@ impl Constrainable for HingeQuatConstraint {
             self.q0 = Some(a.transform.rotation.inverse() * b.transform.rotation);
         }
         // get the world space position of the hinge from body_a's orientation
-        let world_anchor_a =
-            RBHelper::local_to_world(a.transform.as_ref(), a.center_of_mass, self.offset);
+        let world_anchor_a = 
+            RBHelper::local_to_world(&a.transform, a.center_of_mass, self.anchor_a);
         let world_anchor_b =
-            RBHelper::local_to_world(b.transform.as_ref(), b.center_of_mass, self.parent_offset);
+            RBHelper::local_to_world(&b.transform, b.center_of_mass, self.anchor_b);
 
         let r = world_anchor_b - world_anchor_a;
-        let ra =
-            world_anchor_a - RBHelper::centre_of_mass_world(a.transform.as_ref(), a.center_of_mass);
-        let rb =
-            world_anchor_b - RBHelper::centre_of_mass_world(b.transform.as_ref(), b.center_of_mass);
-        let a_anchor = world_anchor_a;
-        let b_anchor = world_anchor_b;
+        let ra = world_anchor_a - RBHelper::centre_of_mass_world(&a.transform, a.center_of_mass);
+        let rb = world_anchor_b - RBHelper::centre_of_mass_world(&b.transform, b.center_of_mass);
 
         // get the orientation information of the bodies
         let q1 = a.transform.rotation;
@@ -88,22 +70,22 @@ impl Constrainable for HingeQuatConstraint {
 
         // the distance constraint
         {
-            let j1 = (a_anchor - b_anchor) * 2.0;
+            let j1 = (world_anchor_a - world_anchor_b) * 2.0;
             self.jacobian.rows[0][0] = j1.x;
             self.jacobian.rows[0][1] = j1.y;
             self.jacobian.rows[0][2] = j1.z;
 
-            let j2 = ra.cross((a_anchor - b_anchor) * 2.0);
+            let j2 = ra.cross((world_anchor_a - world_anchor_b) * 2.0);
             self.jacobian.rows[0][3] = j2.x;
             self.jacobian.rows[0][4] = j2.y;
             self.jacobian.rows[0][5] = j2.z;
 
-            let j3 = (b_anchor - a_anchor) * 2.0;
+            let j3 = (world_anchor_b - world_anchor_a) * 2.0;
             self.jacobian.rows[0][6] = j3.x;
             self.jacobian.rows[0][7] = j3.y;
             self.jacobian.rows[0][8] = j3.z;
 
-            let j4 = rb.cross((b_anchor - a_anchor) * 2.0);
+            let j4 = rb.cross((world_anchor_b - world_anchor_a) * 2.0);
             self.jacobian.rows[0][9] = j4.x;
             self.jacobian.rows[0][10] = j4.y;
             self.jacobian.rows[0][11] = j4.z;
@@ -162,6 +144,7 @@ impl Constrainable for HingeQuatConstraint {
         // apply warm starting from last frame
         let impulses = self.jacobian.transpose() * self.cached_lambda;
         Constraint::apply_impulses(a, b, impulses);
+
         // calculate the baumgarte stabilization
         let c = r.dot(r);
         let c = f32::max(0.0, c - 0.01);
