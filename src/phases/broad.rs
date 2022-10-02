@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{bvh::Tlas, types::*};
-
+use crate::{bvh::{Tlas, TlasNode, TlasNodeTrait}, types::*, TlasQuery};
 
 
 
@@ -120,42 +119,53 @@ fn cmp_z_axis(
 #[allow(dead_code)]
 pub fn broad_phase_bvh(
     tlas: Res<Tlas>,
+    tlas_query: Query<TlasQuery>,
     mut broad_contacts: EventWriter<BroadContact>,
     mut stack: Local<Vec<(u16, u16)>>,
     mut static_query: Query<Entity, With<Static>>,
 ) {    
-    for node in tlas.nodes.iter().filter(|n| !n.is_leaf()) {
-        stack.push((node.left, node.right));        
+    for node in tlas.nodes.iter() {
+        match node {
+            TlasNode::Trunk(t) => {
+                stack.push((t.left, t.right));        
+            },
+            _ => {}
+        }
+        
     }
 
     while let Some((a, b)) = stack.pop() {
 
         let node_a = &tlas.nodes[a as usize];
         let node_b = &tlas.nodes[b as usize];
-        if node_a.aabb.intersection(&node_b.aabb) {
-            if node_a.is_leaf() && node_b.is_leaf() {
-                // possible collision
-                let entity_a = tlas.blas[node_a.blas as usize].entity.unwrap();
-                let entity_b = tlas.blas[node_b.blas as usize].entity.unwrap();
+        if node_a.get_aabb(&tlas_query).intersection(&node_b.get_aabb(&tlas_query)) {
+            match (node_a, node_b) {
+                (TlasNode::Leaf(la), TlasNode::Leaf(lb)) => {
+            
+                    // possible collision
+                    let entity_a = la.entity.unwrap();
+                    let entity_b = lb.entity.unwrap();
 
-                // if both are not static send broad collision
-                if static_query.get_many_mut([entity_a, entity_b]).is_err() {
-                    //info!("Broad contact: {} {}", a, b);
-                    broad_contacts.send(BroadContact {
-                        a: entity_a,
-                        b: entity_b,
-                    });
-                }
-            } else {
-                // ‘Descend A’ descent rule
-                if !node_a.is_leaf() {
-                    stack.push((node_a.right, b));
-                    stack.push((node_a.left, b));
-
-                } else {
-                    stack.push((a, node_b.right));
-                    stack.push((a, node_b.left));
-                }
+                    // if both are not static send broad collision
+                    if static_query.get_many_mut([entity_a, entity_b]).is_err() {
+                        //info!("Broad contact: {} {}", a, b);
+                        broad_contacts.send(BroadContact {
+                            a: entity_a,
+                            b: entity_b,
+                        });
+                    }
+                },
+      
+                (TlasNode::Trunk(ta), TlasNode::Leaf(_)) => {
+                    // ‘Descend A’ descent rule
+                    stack.push((ta.right, b));
+                    stack.push((ta.left, b));
+                },
+                (TlasNode::Leaf(_), TlasNode::Trunk(tb)) => {
+                    stack.push((a, tb.right));
+                    stack.push((a, tb.left));
+                },
+                _ => {}
             }
         }
     }

@@ -227,3 +227,7 @@ pub struct InertiaTensor(pub Mat3);
 #[derive(Component, Reflect, Debug, Default)]
 #[reflect(Component)]
 pub struct InverseInertiaTensor(pub Mat3);
+
+#[derive(Component, Reflect, Debug, Default)]
+#[reflect(Component)]
+pub struct InverseTransform(pub Mat4);

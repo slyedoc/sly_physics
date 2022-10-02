@@ -1,6 +1,6 @@
 use bevy::{pbr::NotShadowCaster, prelude::*};
 use bevy_inspector_egui::{bevy_egui::EguiContext, prelude::*};
-use sly_physics::prelude::*;
+use sly_physics::{prelude::*, TlasQuery};
 
 use super::Keep;
 
@@ -57,6 +57,7 @@ fn cursor_system(
     windows: Res<Windows>,
     camera_query: Query<(&Camera, &Transform), Without<Cursor>>,
     mut cusror_query: Query<(&mut Transform, &mut Visibility), With<Cursor>>,
+    tlas_query: Query<TlasQuery>,
     tlas: Res<Tlas>,
     colliders: Res<Assets<Collider>>,
     mouse_input: Res<Input<MouseButton>>,
@@ -74,7 +75,7 @@ fn cursor_system(
                 let mut ray = Ray::from_camera(camera, camera_transform, mouse_pos);
 
                 // test ray agaist tlas and see if we hit
-                let hit_maybe = ray.intersect_tlas(&tlas, &colliders);
+                let hit_maybe = ray.intersect_tlas(&tlas, &tlas_query, &colliders);
 
                 if let Some(hit) = hit_maybe {
                     // we could do something with the entity here

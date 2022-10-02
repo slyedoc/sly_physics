@@ -20,7 +20,7 @@ use bytemuck::cast_slice;
 use iyes_loopless::state::CurrentState;
 
 use super::{PhysicsDebugState, AABB_INDICES, AABB_INDICES_LEN, AABB_VERTEX_POSITIONS};
-use crate::{prelude::Tlas, types::Aabb};
+use crate::{prelude::Tlas, types::Aabb, bvh::TlasNode};
 
 const BVH_AABBS_SHADER: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 16671319754544664048);
@@ -102,9 +102,11 @@ fn extract_bvh_aabbs(
     bvh_aabbs.data.clear();
     if current_state.0 == PhysicsDebugState::Running {
         for node in tlas.nodes.iter() {
-            if !node.is_leaf() {
-                bvh_aabbs.data.push(node.aabb);
+            match node {
+                TlasNode::Trunk(t) => bvh_aabbs.data.push(t.aabb),
+                _ => {}
             }
+            
         }
     }
 }

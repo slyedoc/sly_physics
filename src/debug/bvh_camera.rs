@@ -1,6 +1,6 @@
 use crate::{
     prelude::Collider, utils::ParallelSliceEnumerateMut, PhysicsFixedUpdate, PhysicsSystem, Ray,
-    Tlas,
+    Tlas, TlasQuery,
 };
 use bevy::{
     math::vec3,
@@ -142,6 +142,7 @@ impl BvhCamera {
 pub fn render_image(
     mut commands: Commands,
     mut camera_query: Query<(&mut BvhCamera, &Transform)>,
+    tlas_query: Query<TlasQuery>,
     node_query: Query<&Node>,
     mut images: ResMut<Assets<Image>>,
     tlas: Res<Tlas>,
@@ -220,7 +221,7 @@ pub fn render_image(
                     let v = y as f32 / camera.height as f32;
                     let mut ray = camera.get_ray(u, 1.0 - v);
                     let mut hit_color = Color::BLACK;
-                    if let Some(hit) = ray.intersect_tlas(&tlas, &colliders) {
+                    if let Some(hit) = ray.intersect_tlas(&tlas, &tlas_query, &colliders) {
                         if let Some(color) = entity_colors.get(&hit.entity) {
                             hit_color = *color;
                         }

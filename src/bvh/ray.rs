@@ -1,10 +1,13 @@
 use std::mem::swap;
 
 use crate::{
-    bvh::{BvhInstance, BvhTri, Tlas, TlasNode},
+    bvh::{BvhTri, Tlas, TlasNode},
     prelude::{Collidable, Collider},
-    types::Aabb,
+    types::Aabb, TlasQuery,
 };
+
+use crate::bvh::TlasNodeTrait;
+
 use bevy::prelude::*;
 
 #[derive(Debug, Clone, Copy)]
@@ -154,15 +157,19 @@ impl Ray {
 
     pub fn intersect_collider_instance(
         &mut self,
+        query: &Query<TlasQuery>,
         colliders: &Assets<Collider>,
-        bvh_instance: &BvhInstance,
-    ) {        
-        let collider = colliders.get(&bvh_instance.collider).unwrap();
+        entity: Entity,
+
+    ) { 
+        let blas = query.get(entity).unwrap();   
+        let collider = colliders.get(&blas.collider).unwrap();
+
         // backup ray and transform original
         let mut backup_ray = *self;
 
-        self.origin = bvh_instance.inv_trans.transform_point3(self.origin);
-        self.direction = bvh_instance.inv_trans.transform_vector3(self.direction);
+        self.origin = blas.inv_trans.0.transform_point3(self.origin);
+        self.direction = blas.inv_trans.0.transform_vector3(self.direction);
         self.direction_inv = self.direction.recip();
         if let Some(t) = collider.intersect(self) {
             if let Some(hit) = self.hit {
@@ -172,7 +179,7 @@ impl Ray {
                         u: 0.5,
                         v: 0.5,
                         tri_index: 0,
-                        entity: bvh_instance.entity.unwrap(),
+                        entity: entity,
                     });
                 }
             } else {
@@ -181,7 +188,7 @@ impl Ray {
                     u: 0.5,
                     v: 0.5,
                     tri_index: 0,
-                    entity: bvh_instance.entity.unwrap(),
+                    entity: entity,
                 });
             }
         };
@@ -191,42 +198,48 @@ impl Ray {
         *self = backup_ray;
     }
 
-    pub fn intersect_tlas(&mut self, tlas: &Tlas, colliders: &Assets<Collider>) -> Option<Hit> {
-        if tlas.nodes.is_empty() || tlas.blas.is_empty() {
+    pub fn intersect_tlas(&mut self, tlas: &Tlas, query: &Query<TlasQuery>, colliders: &Assets<Collider>) -> Option<Hit> {
+        if tlas.nodes.is_empty() {
             return None;
         }
         let mut stack = Vec::<&TlasNode>::with_capacity(64);
         let mut node = &tlas.nodes[0];
         loop {
-            if node.is_leaf() {
-                self.intersect_collider_instance(colliders, &tlas.blas[node.blas as usize]);
-                if stack.is_empty() {
-                    break;
-                } else {
-                    node = stack.pop().unwrap();
+            match node {
+                TlasNode::Leaf(leaf) => {
+                    self.intersect_collider_instance(query, colliders, leaf.entity.unwrap());
+                    if stack.is_empty() {
+                        break;
+                    } else {
+                        node = stack.pop().unwrap();
+                    }
+                    continue;
                 }
-                continue;
-            }
-            let mut child1 = &tlas.nodes[node.right()];
-            let mut child2 = &tlas.nodes[node.left()];
-            let mut dist1 = self.intersect_aabb(&child1.aabb);
-            let mut dist2 = self.intersect_aabb(&child2.aabb);
-            if dist1 > dist2 {
-                swap(&mut dist1, &mut dist2);
-                swap(&mut child1, &mut child2);
-            }
-            if dist1 == f32::MAX {
-                if stack.is_empty() {
-                    break;
-                } else {
-                    node = stack.pop().unwrap();
+                TlasNode::Trunk(trunk) => {
+                    let mut child1 = &tlas.nodes[trunk.right as usize];
+                    let mut child2 = &tlas.nodes[trunk.left as usize];
+                    let mut dist1 = self.intersect_aabb(&child1.get_aabb(query));
+                    let mut dist2 = self.intersect_aabb(&child2.get_aabb(query));
+                    if dist1 > dist2 {
+                        swap(&mut dist1, &mut dist2);
+                        swap(&mut child1, &mut child2);
+                    }
+                    if dist1 == f32::MAX {
+                        if stack.is_empty() {
+                            break;
+                        } else {
+                            node = stack.pop().unwrap();
+                        }
+                    } else {
+                        node = child1;
+                        if dist2 != f32::MAX {
+                            stack.push(child2);
+                        }
+                    }
                 }
-            } else {
-                node = child1;
-                if dist2 != f32::MAX {
-                    stack.push(child2);
-                }
             }
+
+          
         }
         self.hit
     }

@@ -22,7 +22,7 @@ pub fn narrow_phase(
 ) {
     let broad_contacts = broad_contacts.iter()
      .collect::<Vec<_>>();
-    info!("Narrow phase contacts: {}", broad_contacts.len());
+    //info!("Narrow phase contacts: {}", broad_contacts.len());
 
     let contact_results = broad_contacts
      .par_splat_map(ComputeTaskPool::get(), None, |chunk| {

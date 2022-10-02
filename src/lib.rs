@@ -60,6 +60,7 @@ pub struct RigidBodyBundle {
     pub center_of_mass: CenterOfMass,
     pub inertia_tensor: InertiaTensor,
     pub inverse_inertia_tensor: InverseInertiaTensor,
+    pub inverse_transform: InverseTransform,
     pub aabb: Aabb,
     // Will be added
 
@@ -76,6 +77,16 @@ pub struct RBQuery {
     inv_mass: &'static InverseMass,
     inv_inertia_tensor: &'static InverseInertiaTensor,
     center_of_mass: &'static CenterOfMass,
+}
+
+#[derive(WorldQuery)]
+#[world_query(derive(Debug))]
+pub struct TlasQuery {
+    entity: Entity,
+    transform: &'static GlobalTransform,    
+    collider: &'static Handle<Collider>,
+    inv_trans: &'static InverseTransform,
+    aabb: &'static Aabb,    
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
@@ -273,32 +284,23 @@ fn stop_step(mut commands: Commands) {
 }
 
 pub fn update_aabb(
-    mut query: Query<(&GlobalTransform, &mut Aabb, &Handle<Collider>, &Velocity)>,
+    mut query: Query<(&GlobalTransform, &mut InverseTransform,  &mut Aabb, &Handle<Collider>, &Velocity)>,
     config: Res<PhysicsConfig>,
     colliders: Res<Assets<Collider>>,
 ) {
-    for (trans, mut aabb, col, lin_vel) in query.iter_mut() {
+    for (trans, mut inv_trans, mut aabb, col, lin_vel) in query.iter_mut() {
         let collider = colliders.get(col).unwrap();
         *aabb = collider.get_world_aabb(trans, lin_vel, config.time);
+        inv_trans.0 = trans.compute_matrix().inverse();
     }
 }
 
 // TODO: this update system are incomplete, for now rebuilding every frame
 #[allow(dead_code)]
 fn update_tlas(
-    query: Query<(Entity, &Handle<Collider>, &Transform, &Aabb)>,
+    query: Query<TlasQuery>,
     mut tlas: ResMut<Tlas>,
 ) {
-    // update_bvh_instances;
-    tlas.blas.clear();
-    for (entity, col, trans, aabb) in query.iter() {
-        tlas.blas.push(BvhInstance {
-            entity: Some(entity),
-            collider: col.clone(),
-            inv_trans: trans.compute_matrix().inverse(),
-            bounds: *aabb,
-        });
-    }
 
     // Build Tlas
     tlas.nodes.clear();
@@ -306,40 +308,40 @@ fn update_tlas(
     // reserve root node
     tlas.nodes.push(TlasNode::default());
 
-    let mut node_index = vec![0u32;  tlas.blas.len() + 1];
-    let mut node_indices = tlas.blas.len() as i32;
+    let mut node_index = vec![0u32;  query.iter().count() + 1];
+    let mut node_indices = query.iter().count() as i32;
 
     // assign a TLASleaf node for each BLAS and build node indexes
-    for (i, (_entity, _col, _trans, aabb)) in query.iter().enumerate() {
+    for (i, blas) in query.iter().enumerate() {
         node_index[i] = i as u32 + 1;
-        tlas.nodes.push(TlasNode {
-            aabb: *aabb,
-            blas: i as u32,
-            ..default()
-        });
+        tlas.nodes.push(TlasNode::Leaf(Leaf {
+            entity: Some(blas.entity),
+        }));
     }
 
     // use agglomerative clustering to build the TLAS
     let mut a = 0i32;
-    let mut b = tlas.find_best_match(&node_index, node_indices, a);
+    let mut b = tlas.find_best_match(&node_index, node_indices, a, &query);
     while node_indices > 1 {
-        let c = tlas.find_best_match(&node_index, node_indices, b);
+        let c = tlas.find_best_match(&node_index, node_indices, b, &query);
         if a == c {
             let node_index_a = node_index[a as usize];
             let node_index_b = node_index[b as usize];
             let node_a = &tlas.nodes[node_index_a as usize];
             let node_b = &tlas.nodes[node_index_b as usize];
-            let aabb =   node_a.aabb + node_b.aabb;
-            tlas.nodes.push(TlasNode {
-                aabb: aabb,                
+            let aabb_a = node_a.get_aabb(&query);
+            let aabb_b = node_b.get_aabb(&query);
+            let aabb = aabb_a + aabb_b;
+
+            tlas.nodes.push(TlasNode::Trunk(Trunk {
+                aabb,                
                 left: node_index_a as u16,
                 right: node_index_b as u16,
-                blas: 0,
-            });
+            }));
             node_index[a as usize] = tlas.nodes.len() as u32 - 1;
             node_index[b as usize] = node_index[node_indices as usize - 1];
             node_indices -= 1;
-            b = tlas.find_best_match(&node_index, node_indices, a);
+            b = tlas.find_best_match(&node_index, node_indices, a, &query);
         } else {
             a = b;
             b = c;

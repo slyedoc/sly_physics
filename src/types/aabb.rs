@@ -47,6 +47,16 @@ impl Add<Aabb> for Aabb {
     }
 }
 
+impl Add<&Aabb> for &Aabb {
+    type Output = Aabb;
+    fn add(self, b: &Aabb) -> Self::Output {
+        Aabb {
+            mins: Vec3::min(self.mins, b.mins),
+            maxs: Vec3::max(self.maxs, b.maxs),
+        }
+    }
+}
+
 impl AddAssign<Aabb> for Aabb {
     fn add_assign(&mut self, rhs: Aabb) {
         self.mins = self.mins.min(rhs.mins);
