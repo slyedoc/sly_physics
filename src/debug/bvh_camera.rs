@@ -150,7 +150,12 @@ pub fn render_image(
     entity_colors: Res<CameraDebugColors>,
 ) {
     // you really only want one bvh camera,
-    let (mut camera, trans) = camera_query.single_mut();
+    let camera_result = camera_query.get_single_mut();
+
+    if camera_result.is_err() {
+       return; 
+    }
+    let (mut camera, trans) = camera_result.unwrap();
 
     // setup image if needed
     if camera.image.is_none() {
