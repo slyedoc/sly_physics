@@ -46,14 +46,17 @@ pub struct PhysicsDebugPlugin;
 impl Plugin for PhysicsDebugPlugin {
     fn build(&self, app: &mut App) {
         app.add_loopless_state(PhysicsDebugState::Paused)
-            .add_plugin(DebugBvhCameraPlugin)
+            .add_plugin(DebugBvhCameraPlugin);
             // Rendering debug systems
             // TODO: These are some of the first pipelines I have made, and all 3 use different techniques
             // as I was learning, should most likely switch them to draw_indexed instanced
             // but these work and all are far faster than what i was doing, creating meshes for each every frame
-            .add_plugin(DebugEntityAabbPlugin) // draw call per entity with dynamic uniform
-            .add_plugin(DebugBvhAabbPlugin) // expanded index buffer, one draw call
-            .add_plugin(DebugContactsPlugin) // draw_indexed instanced, one draw call
-            .add_plugin(DebugConstraintsPlugin); // draw_indexed instanced,
+            #[cfg(not(target_arch = "wasm32"))]
+            app.add_plugin(DebugEntityAabbPlugin); // draw call per entity with dynamic uniform
+            #[cfg(not(target_arch = "wasm32"))]
+            app.add_plugin(DebugBvhAabbPlugin); // expanded index buffer, one draw call
+            #[cfg(not(target_arch = "wasm32"))]
+            app.add_plugin(DebugContactsPlugin); // draw_indexed instanced, one draw call            
+            app.add_plugin(DebugConstraintsPlugin); // draw_indexed instanced,
     }
 }

@@ -229,7 +229,7 @@ pub fn spawn(
     mut query: Query<
         (
             Entity,
-            &Handle<Collider>,
+            &mut Handle<Collider>,
             &RigidBody,
             &mut Mass,
             &mut CenterOfMass,
@@ -238,11 +238,11 @@ pub fn spawn(
         ),
         Added<Handle<Collider>>,
     >,
-    colliders: Res<Assets<Collider>>,
+    mut colliders: ResMut<Assets<Collider>>,
 ) {
     for (
         e,
-        collider_handle,
+        mut collider_handle,
         rb_mode,
         mut mass,
         mut center_of_mass,
@@ -250,7 +250,14 @@ pub fn spawn(
         mut inverse_inertia_tensor,
     ) in query.iter_mut()
     {
-        let collider = colliders.get(collider_handle).unwrap();
+        // Create collider if it doesn't exist
+        let collider_result = colliders.get(&collider_handle);
+        let collider = if collider_result.is_none() {
+            *collider_handle = colliders.add(Collider::default());
+            colliders.get(&collider_handle).unwrap()            
+        } else {
+            collider_result.unwrap()
+        };
 
         // Setup RigidBody components
         let is_static = match rb_mode {

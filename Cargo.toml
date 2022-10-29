@@ -37,7 +37,7 @@ trace = ["bevy/trace", "bevy/trace_chrome"]
 [dependencies]
 bevy =  { version = "0.8.1" }
 bevy-inspector-egui = { version = "0.13.0" }
-iyes_loopless = { version = "0.7.1" }
+iyes_loopless = { version = "0.8.0" }
 bytemuck = "1.12.1"
 enum_dispatch = "0.3.8"
 smallvec = "1.9.0"
